@@ -1,5 +1,5 @@
 # Dam-Orama
-### Game Design Specification — v0.2
+### Game Design Specification — v0.3
 
 ---
 
@@ -54,14 +54,15 @@ The interesting decisions emerge from combining materials — stone facing with 
 
 Water is the teacher. Its behaviour must be physically legible — a player should be able to look at a breach and understand immediately what caused it.
 
-Four key failure modes, in order of subtlety:
+Three failure modes ship in Level 1, in order of subtlety:
 
-1. **Seepage** — water pushes through porous or poorly-packed material before overtopping. The first sign is a dark wet patch on the downstream face. This is the most satisfying failure to prevent.
-2. **Erosion** — sustained flow gradually removes soft material from the base. Visible as the structure slowly thinning at its foot.
-3. **Undermining** — water finds a path *under* the structure, causing it to tilt and eventually topple. Punishes players who build tall but ignore foundations.
-4. **Overtopping** — the obvious failure. Reserved for events that genuinely exceed the current structure's capacity, not lazy building.
+1. **Erosion** — sustained flow gradually removes soft material from the base. Visible as the structure slowly thinning at its foot.
+2. **Undermining** — water finds a path *under* the structure, causing it to tilt and eventually topple. Punishes players who build tall but ignore foundations.
+3. **Overtopping** — the obvious failure. Reserved for events that genuinely exceed the current structure's capacity, not lazy building.
 
 The simulation should run at a resolution that makes these behaviours visible and readable at the scale of the diorama. This is the primary technical challenge of the game.
+
+**Deferred: Seepage.** Seepage (water pushing through porous material before overtopping, visible as a dark wet patch on the downstream face) is the most satisfying failure to prevent and remains a design goal. However, it requires subsurface flow modelling (e.g. a secondary Darcy flow pass) that the SWE Virtual Pipes method does not natively support. Seepage is deferred to a future upgrade and is not modelled in Level 1. The per-cell permeability system in the water sim is designed to accommodate seepage when the subsurface layer is added.
 
 ---
 
@@ -74,10 +75,10 @@ Early levels are generous — plenty of materials, a simple water source, a mild
 - Multiple water sources or inflow directions
 - Asymmetric terrain that creates natural weak points
 - Scarcer or more unusual material combinations (all stone, no clay; plenty of sand, one timber stake)
-- Seasonal memory — terrain deformed by the previous flood becomes this season's liability
+- Seasonal memory — terrain deformed by the previous flood becomes this season's liability *(future scope — not in Level 1; see Seasonal Memory section)*
 - Protected zones — some houses matter more than others; partial containment scores partial credit
 
-There is no "solved" state that persists indefinitely. Across seasons, the world accumulates change. Ground that was stable last season is now pre-eroded. A dam that held at flood level 3 might fail at level 4 even without modification. The player is always renegotiating.
+There is no "solved" state that persists indefinitely. In future multi-round levels, the world will accumulate change across seasons. Ground that was stable last season becomes pre-eroded. A dam that held at flood level 3 might fail at level 4 even without modification. The player is always renegotiating. *(Level 1 is a single flood event with clean reset on replay.)*
 
 ---
 
@@ -135,19 +136,22 @@ The Shallow Water Equations (SWE) model water as a height-column grid: each cell
 **Implementation reference:** `lisyarus/webgpu-shallow-water` (MIT licence, GitHub). This is an open-source WebGPU compute shader implementation of the Virtual Pipes method running on a 256×256 grid in real time in the browser. The codebase is the direct starting point for the water layer.
 
 **Key parameters:**
-- Grid resolution: **256×256** cells (maps to the diorama footprint; each cell ≈ terrain tile)
-- Time step: determined by CFL condition; ~1–4 GPU substeps per rendered frame
+- Grid resolution: **512×512** cells (unified grid — terrain and water share the same resolution and coordinate space, 1:1 cell mapping)
+- Time step: determined by CFL condition; ~2–6 GPU substeps per rendered frame
 - Flow model: Virtual Pipes with outflow scaling (Dagenais et al.)
-- Seepage: modelled as a per-cell permeability coefficient — sand has high permeability, clay low, stone near-zero
-- Erosion: cells with sustained high-velocity flow above an erosion threshold incrementally lower their terrain height and increase permeability
+- Per-cell permeability coefficient: sand = high, clay = low, stone = near-zero (infrastructure for future seepage; in Level 1 permeability only affects erosion rate)
+- Erosion: cells with sustained high-velocity flow above an erosion threshold incrementally lower their terrain height
+
+**Grid unification:** The terrain heightmap and the water simulation operate on the same 512×512 grid. There is no separate terrain grid — the water sim grid *is* the terrain grid. Each cell stores: terrain height, water depth, material type, and permeability. This eliminates grid-mapping complexity and ensures pixel-perfect alignment between water behaviour and visible terrain.
 
 **WebGPU fallback:** For browsers or devices without WebGPU (older Android, iOS < 26), fall back to the existing CPU heightfield simulation. This runs at a lower resolution (128×128) but is sufficient for level 1 and 2 difficulty. The fallback is implemented as a separate codepath with identical API surface.
 
-**Failure modes modelled:**
-- Seepage: water infiltrates cells with non-zero permeability even when not overtopping
+**Failure modes modelled in Level 1:**
 - Erosion: soft-material cells lose height under sustained flow
 - Overtopping: water exceeds dam height and spills over
 - Undermining: erosion at the base of a structure removes support; rigid body layer handles the resulting collapse
+
+**Deferred failure mode:** Seepage (subsurface flow through permeable material) requires a secondary Darcy flow simulation layer. The per-cell permeability data is stored and maintained so that seepage can be added in a future update without restructuring the grid.
 
 #### Layer 2 — Rigid body physics: Rapier.js
 
@@ -175,10 +179,6 @@ A lightweight particle system runs on top of both physics layers to provide visu
 
 These are purely cosmetic and are not fed back into either physics layer.
 
-#### Special level physics: MLS-MPM upgrade path
-
-For levels where spectacular fluid behaviour is central to the experience (tsunami, Atlantis rising water, glacial melt), the water layer can be swapped to **MLS-MPM** (Moving Least Squares Material Point Method) via `matsuoka-601/WebGPU-Ocean` (MIT licence). This runs 100k–300k particles in real time on WebGPU and produces volumetric splashing, wave crests, and soft-body sand that the SWE layer cannot. This upgrade path requires WebGPU and is not available on the fallback codepath. It is not used in Level 1.
-
 ---
 
 ### Browser and Platform Requirements
@@ -203,7 +203,7 @@ All interactions are implemented using the **Pointer Events API** (not touch eve
 | Gesture | Action |
 |---|---|
 | 1-finger drag on terrain | Sculpt / place material at cursor position |
-| 1-finger drag on empty basin | No action (reserved for future pan) |
+| 1-finger drag on empty basin | Pan camera (translate horizontally) |
 | 2-finger pinch | Resize sculpt brush radius |
 | 2-finger rotate | Orbit camera horizontally |
 | 2-finger spread/pinch | Zoom camera |
@@ -222,7 +222,7 @@ WASD keyboard controls remain available on desktop as secondary input. Keyboard 
 |---|---|
 | 3D rendering | Three.js (latest stable, not r128) |
 | WebGPU renderer | Three.js `WebGPURenderer` (experimental path, replaces WebGLRenderer) |
-| Terrain mesh | `PlaneGeometry` with vertex displacement from SWE height grid |
+| Terrain mesh | `PlaneGeometry` with vertex displacement from 512×512 unified grid |
 | Water surface | Separate `PlaneGeometry` with `MeshPhysicalMaterial`, `transmission`, `roughness: 0.05`, env map |
 | Rigid bodies (visual) | `BoxGeometry` / `CylinderGeometry` synced from Rapier body positions each frame |
 | Particles | `Points` geometry with custom `ShaderMaterial`, billboard quads |
@@ -230,6 +230,8 @@ WASD keyboard controls remain available on desktop as secondary input. Keyboard 
 | Post-processing | None in Level 1. Optional: subtle vignette, slight colour grade for atmosphere |
 
 **Upgrade note on Three.js version:** The current prototype uses r128 to avoid importing OrbitControls. The production build should use the latest Three.js (r168 or current at build time) with `WebGPURenderer` for the compute shader integration. The custom orbit camera code from the prototype is retained — no dependency on OrbitControls.
+
+**Migration note:** Moving from r128 WebGLRenderer to latest Three.js WebGPURenderer is effectively a rewrite of the rendering layer, not a port. The shader pipeline, material system, and renderer API have changed significantly. Step 2 in the development sequence should target WebGLRenderer first (to preserve visual parity with the prototype), and Step 3 introduces WebGPURenderer alongside the GPU water sim. This avoids coupling two large changes into one step.
 
 ---
 
@@ -275,10 +277,10 @@ These are the build steps for the agentic coding phase, in strict dependency ord
 Set up Vite + Three.js (latest) project. Confirm `WebGPURenderer` renders a blank scene in Chrome. Add Rapier.js WASM dependency (`@dimforge/rapier3d-compat`). Confirm Rapier initialises and a falling box simulation runs in the console without rendering.
 
 **Step 2 — Port existing prototype into module structure**
-Move terrain mesh, camera, water simulation, and UI controls from `experimentarium3d.html` into the `src/` module structure above. The result should be visually identical to the current prototype but running in Vite with proper module imports.
+Move terrain mesh, camera, water simulation, and UI controls from `experimentarium3d.html` into the `src/` module structure above. Use latest Three.js with `WebGLRenderer` (not WebGPURenderer yet) to preserve visual parity with the prototype. The result should be visually identical to the current prototype but running in Vite with proper module imports. WebGPURenderer migration happens in Step 3.
 
 **Step 3 — GPU water simulation**
-Implement `WaterSimGPU.js` using WebGPU compute shaders based on the Virtual Pipes method. Target: 256×256 grid, stable simulation, water flows downhill correctly, source pipe fills the basin. CPU fallback (`WaterSimCPU.js`) is the existing heightfield code extracted from the prototype.
+Implement `WaterSimGPU.js` using WebGPU compute shaders based on the Virtual Pipes method. Switch the renderer from `WebGLRenderer` to `WebGPURenderer` in this step. Target: 512×512 unified grid, stable simulation, water flows downhill correctly, source pipe fills the basin. CPU fallback (`WaterSimCPU.js`) is the existing heightfield code extracted from the prototype, running at 128×128.
 
 **Step 4 — Rigid body integration**
 Implement `RigidBodies.js`. Place 5 stone blocks on the terrain via the UI. Confirm they sit on the terrain mesh, stack stably, and topple when their base is removed programmatically. Sync Rapier body positions to Three.js meshes every frame.
@@ -287,10 +289,10 @@ Implement `RigidBodies.js`. Place 5 stone blocks on the terrain via the UI. Conf
 Water sim checks Rapier body AABBs each step. Cells overlapping a body are blocked. Confirm water flows around placed stone blocks. Confirm a block placed mid-stream visibly deflects water flow.
 
 **Step 6 — Material system**
-Implement material placement: sand (terrain sculpt, high permeability), clay (terrain sculpt, low permeability), stone block (Rapier rigid body), timber stake (Rapier rigid body, thin cylinder). Add per-cell permeability to the water sim grid. Confirm seepage visually: water darkens the downstream face of a clay dam before overtopping.
+Implement material placement: sand (terrain sculpt, high erosion rate), clay (terrain sculpt, low erosion rate), stone block (Rapier rigid body, immune to erosion), timber stake (Rapier rigid body, thin cylinder, degrades over time). Add per-cell material type and permeability to the water sim grid (permeability stored for future seepage support; in Level 1 it only modulates erosion rate). Confirm erosion visually: sand erodes faster than clay under identical flow.
 
 **Step 7 — House objects and flood detection**
-Add 3 house meshes as static Rapier bodies at fixed positions. Water sim fires `CELL_FLOODED` event when water depth exceeds 0.1 in a cell containing a house. On event: house turns to flood visual state (darker, waterlogged shader), level resolution logic triggers.
+Add 3 house meshes as static Rapier bodies at fixed positions. Water sim fires `CELL_FLOODED` event when water depth exceeds 0.1 in any cell overlapping a house footprint for at least 60 consecutive frames (~1 second at 60fps). This hysteresis prevents flickering from frame-to-frame depth fluctuations. A house unfloods only when depth drops below 0.05 for 30 consecutive frames. On flood event: house transitions to flood visual state (darker, waterlogged shader), level resolution logic triggers.
 
 **Step 8 — Game loop and phase state machine**
 Implement construction → flood → resolution phases. Construction: sculpt and place freely, no water flowing. Flood: trigger releases water from source, player can observe and make minor edits. Resolution: evaluate win/loss, show result, offer replay.
@@ -299,7 +301,7 @@ Implement construction → flood → resolution phases. Construction: sculpt and
 Level JSON specifies available material units per type. UI displays remaining budget. Placement is blocked when budget is exhausted.
 
 **Step 10 — Level 1 complete**
-Author `level-01.json` with: 160×160 terrain grid, flat centre with gentle valley, single central water source, 3 houses on far side, budget of 20 sand units + 10 clay units + 6 stone blocks. Playtest and tune flood rate, erosion rate, and material permeability constants.
+Author `level-01.json` with: 512×512 unified grid, flat centre with gentle valley, single central water source, 3 houses on far side, budget of 20 sand units + 10 clay units + 6 stone blocks + 4 timber stakes. Playtest and tune flood rate, erosion rate, and material erosion constants.
 
 **Step 11 — Touch input**
 Implement `InputHandler.js` with Pointer Events. Map all gestures per the touch input table above. Confirm 1-finger sculpt, 2-finger orbit, 2-finger pinch-to-resize-brush all work on a mobile device or Chrome DevTools touch simulation.
@@ -317,24 +319,24 @@ The first level is intentionally simple — it exists to teach material behaviou
 {
   "id": "level-01",
   "name": "The Basin",
-  "grid": { "width": 160, "height": 160, "cellSize": 0.1 },
+  "grid": { "width": 512, "height": 512, "cellSize": 0.03125 },
   "terrain": {
     "type": "procedural",
     "profile": "flat_valley",
-    "valleyWidth": 40,
+    "valleyWidth": 128,
     "valleyDepth": 0.3,
     "valleyDirection": "east-west"
   },
   "waterSource": {
-    "position": { "x": 80, "y": 80 },
-    "radius": 3,
+    "position": { "x": 256, "y": 256 },
+    "radius": 10,
     "flowRate": 0.018,
     "startDelay": 0
   },
   "houses": [
-    { "id": "house-a", "position": { "x": 120, "y": 72 }, "scale": 1.0 },
-    { "id": "house-b", "position": { "x": 124, "y": 80 }, "scale": 0.85 },
-    { "id": "house-c", "position": { "x": 120, "y": 88 }, "scale": 1.0 }
+    { "id": "house-a", "position": { "x": 384, "y": 230 }, "scale": 1.0 },
+    { "id": "house-b", "position": { "x": 396, "y": 256 }, "scale": 0.85 },
+    { "id": "house-c", "position": { "x": 384, "y": 282 }, "scale": 1.0 }
   ],
   "resources": {
     "sand": 20,
@@ -356,12 +358,86 @@ The first level is intentionally simple — it exists to teach material behaviou
 
 ---
 
+### Performance Targets
+
+The game must maintain interactive frame rates across all supported platforms. These are the minimum targets:
+
+| Platform | Target FPS | Water sim grid | Max Rapier bodies |
+|---|---|---|---|
+| Desktop (WebGPU) | 60 fps | 512×512 | 64 |
+| Mobile (WebGPU) | 30 fps | 512×512 | 32 |
+| Fallback (CPU) | 30 fps | 128×128 | 32 |
+
+**Frame budget (desktop at 60fps):** 16.6ms total per frame.
+- Water sim GPU compute: ≤ 4ms (2–6 substeps)
+- Rapier physics step: ≤ 2ms
+- Three.js render: ≤ 8ms
+- JS game logic + coupling: ≤ 2ms
+
+**Adaptive quality:** If frame time exceeds 20ms for 30 consecutive frames, reduce water sim substeps from 6 to 2. If still over budget, halve the water sim grid to 256×256 for the remainder of the session. Log the downgrade to console for debugging.
+
+---
+
+### Undo System
+
+During the construction phase, the player can undo their last placement or sculpt action. This is critical for touch-first interaction where a misplaced finger drag can ruin careful work.
+
+**Implementation:** A stack of terrain snapshots (heightmap + material type arrays). Each sculpt or placement action pushes the affected region (bounding box of changed cells) onto the stack. Undo pops the most recent snapshot and restores those cells. Maximum stack depth: 20 actions. Undo is only available during the construction phase — once the flood starts, the stack is cleared.
+
+**UI:** A single undo button (48×48px minimum) in the construction toolbar. Keyboard shortcut: Ctrl+Z / Cmd+Z on desktop.
+
+---
+
+### Seasonal Memory (Future Scope)
+
+The spec's Progression section references "seasonal memory" — terrain deformed by a previous flood persisting into the next round. This is explicitly **not in scope for Level 1**. Level 1 is a single flood event with a clean reset on replay.
+
+Seasonal memory requires serializing the full 512×512 grid state (terrain height, material type, permeability, erosion damage) between rounds and presenting a multi-round UI. This is a future feature that will be designed when multi-round levels are introduced.
+
+---
+
+### Testing Strategy
+
+Each development step includes a concrete verification criterion. Automated tests are not practical for visual/physics output, so testing is manual with specific pass/fail conditions:
+
+| Step | Verification |
+|---|---|
+| 1 — Scaffold | WebGPURenderer renders a coloured background. Rapier logs a falling box position to console. |
+| 2 — Port | Side-by-side visual comparison with prototype. Camera orbit, sculpt brush, and water flow all function. |
+| 3 — GPU water | Water released from source fills a flat basin evenly. Water flows downhill in a sloped basin. No NaN or instability after 5 minutes. |
+| 4 — Rigid bodies | 5 stacked blocks remain stable for 10 seconds. Removing the bottom block causes collapse. |
+| 5 — Coupling | Water visibly deflects around a placed block. Removing the block allows water to fill the gap. |
+| 6 — Materials | Sand erodes visibly faster than clay under identical flow. Stone blocks are unaffected by erosion. |
+| 7 — Houses | House turns waterlogged after ~1 second of flooding. House recovers if water recedes. |
+| 8 — Game loop | Construction phase allows free placement. Flood phase releases water. Resolution shows win/loss. |
+| 9 — Budget | Placement is blocked when budget hits zero. UI counter decrements correctly. |
+| 10 — Level 1 | Full playthrough: build a dam, survive the flood, win. Intentionally bad dam: houses flood, lose. |
+| 11 — Touch | 1-finger sculpt, 2-finger orbit, pinch-to-zoom all work in Chrome DevTools touch simulation. |
+| 12 — Polish | All UI buttons ≥ 48px. Particles visible at source pipe. Camera has smooth acceleration/damping. |
+
+For physics regression: after tuning constants in any step, re-run the verification for all previous physics steps (3–7) to confirm nothing broke.
+
+---
+
 ## Design Decisions
 
-- **Levels are hand-crafted.** Each level is a distinct diorama with its own dimensions, terrain, pre-placed obstacles, and visual identity. Examples in scope: a coastal level with tsunami waves, a sunken Atlantis level with water rising from below, a mountain valley with a burst upstream dam, a frozen level with melting ice as the water source. Level design will be directed by the game designer.
+- **Levels are hand-crafted.** Each level is a distinct diorama with its own dimensions, terrain, pre-placed obstacles, and visual identity. Level design will be directed by the game designer.
+
+**Level archetypes** (illustrative, not exhaustive — each level is a unique puzzle with distinct water source placement, house positions, pre-built terrain, and resource constraints):
+
+| Archetype | Water behaviour | Terrain character | Example inspiration |
+|---|---|---|---|
+| **River valley** | Steady directional flow from upstream source | Narrow valley with floodplain, houses on the banks | Rhine, Nile delta, Mississippi levees |
+| **Coastal shoreline** | Waves / surge from one edge of the basin | Sloped beach with houses set back from shore | Dutch sea defences, New Orleans levees |
+| **Mountain basin** | Burst dam / flash flood from elevated source | Steep terrain with a narrow gorge feeding into a flat settlement | Alpine valleys, Vajont Dam |
+| **Island / atoll** | Rising water from below (all edges) | Low-lying central island with houses, water encroaching from perimeter | Tuvalu, Venice, Atlantis |
+| **River confluence** | Multiple water sources converging | Two or more channels meeting at a junction where houses sit | Koblenz, Pittsburgh, Chongqing |
+| **Glacial melt** | Slow but relentless rising from a melting ice mass | Frozen terrain that gradually reveals water as ice recedes | Jökulsárlón, Greenland coast |
+
+Each level varies along: water source count and placement, inflow direction and rate, pre-existing terrain features (ridges, channels, slopes), house count and placement, and available resource budget. The puzzle emerges from reading the terrain and water threat, then choosing where and how to spend limited materials. No two levels should feel like the same problem with different numbers.
 - **No multiplayer.** Single-player only.
 - **Touch-first interaction.** The game is designed from the ground up for touch screens. One finger sculpts terrain. Two fingers pinch to resize the brush. Two fingers rotate to orbit the camera. Two fingers spread to zoom. All UI targets are sized for fingertips. Mouse and keyboard on desktop is a supported but secondary input path.
 
 ---
 
-*Spec v0.2 — March 2026. Ready for agentic build phase.*
+*Spec v0.3 — March 2026. Ready for agentic build phase.*
