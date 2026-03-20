@@ -12,8 +12,8 @@
   "waterSource": {
     "type": "pipe",
     "position": { "x": 28, "y": 128 },
-    "radius": 6,
-    "flowRate": 0.12,
+    "radius": 8,
+    "flowRate": 0.15,
     "maxDepth": 2.0,
     "durationSec": 20,
     "startDelaySec": 0

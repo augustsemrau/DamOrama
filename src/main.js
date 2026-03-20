@@ -18,6 +18,7 @@ import { PhaseControls } from './ui/PhaseControls.js';
 import { Toolbar } from './ui/Toolbar.js';
 import { BudgetDisplay } from './ui/BudgetDisplay.js';
 import { Postmortem } from './ui/Postmortem.js';
+import { WaterParticles } from './renderer/WaterParticles.js';
 import levelData from './levels/level-01.json';
 
 let initialTerrainHeight = null;
@@ -90,6 +91,11 @@ async function main() {
   const water = new WaterMesh(grid, cellSize);
   scene.scene.add(water.mesh);
 
+  // Water source particles (falling water effect)
+  const waterParticles = new WaterParticles(scene.scene);
+  const srcCenterI = grid.index(config.waterSource.position.x, config.waterSource.position.y);
+  const srcBaseY = grid.terrainHeight[srcCenterI];
+
   // Basin walls
   createBasinWalls(scene.scene, worldSize);
 
@@ -116,11 +122,13 @@ async function main() {
   const phaseControls = new PhaseControls(container, eventBus, {
     onStartFlood: () => {
       waterSim.setSource(config.waterSource);
+      waterParticles.start(config.waterSource, cellSize, srcBaseY);
       gameLoop.startFlood();
     },
     onRetry: () => {
       gameLoop.retry(() => {
         waterSim.setSource(null);
+        waterParticles.stop();
         resetAll(grid, waterSim, budget, undoSystem, winLoss, water, eventBus);
       });
     }
@@ -147,13 +155,14 @@ async function main() {
     if (gameLoop.phase === 'flood') {
       if (!gameLoop.isSourceActive()) {
         waterSim.setSource(null);
+        waterParticles.stop();
       }
       waterSim.step(dt);
       erosion.step(waterSim.velocity, dt);
       winLoss.checkFlooding();
       water.update();
+      waterParticles.update(dt);
 
-      // Update flood progress bar
       const totalFloodTime = config.waterSource.durationSec + config.sim.settleTimeSec;
       phaseControls.updateFloodProgress(gameLoop._floodElapsed, totalFloodTime);
     }
