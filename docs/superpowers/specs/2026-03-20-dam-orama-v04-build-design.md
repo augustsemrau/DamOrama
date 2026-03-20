@@ -243,10 +243,12 @@ Following the spec's sequence:
 - Tune: flood duration, source rate, erosion rates, level geometry
 - Tune: settle time, flood threshold, brush sizes
 - Playtest readability and retry cadence
+- Optional: replay scrub of last 5 seconds (nice-to-have; static postmortem is sufficient)
 - Deliverable: a level that can be won and lost, where failure is readable
 
 **Milestone 6 — Performance and platform**
-- Quality tier selection at level load
+- QualityManager.js: startup benchmark runs one sim step at each resolution tier (256, 192, 128), picks highest that sustains 60fps. Manual override via URL param (`?quality=low`).
+- Quality tier selection at level load (locked for the run per spec §12.6)
 - Optional WaterSimGPU.js + water-sim.wgsl if CPU can't hold 60fps at 256x256
 - Touch-compatible input (build/inspect mode toggle)
 - Mobile UI sizing (48px touch targets)
