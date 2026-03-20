@@ -113,7 +113,7 @@ async function main() {
   new BudgetDisplay(container, eventBus, budget.snapshot());
   new Postmortem(container, eventBus);
 
-  new PhaseControls(container, eventBus, {
+  const phaseControls = new PhaseControls(container, eventBus, {
     onStartFlood: () => {
       waterSim.setSource(config.waterSource);
       gameLoop.startFlood();
@@ -152,6 +152,10 @@ async function main() {
       erosion.step(waterSim.velocity, dt);
       winLoss.checkFlooding();
       water.update();
+
+      // Update flood progress bar
+      const totalFloodTime = config.waterSource.durationSec + config.sim.settleTimeSec;
+      phaseControls.updateFloodProgress(gameLoop._floodElapsed, totalFloodTime);
     }
 
     // Evaluate win/loss on transition to resolution

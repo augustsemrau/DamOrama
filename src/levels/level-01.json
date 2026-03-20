@@ -19,9 +19,9 @@
     "startDelaySec": 0
   },
   "houses": [
-    { "id": "house-a", "position": { "x": 200, "y": 115 }, "footprint": { "w": 10, "h": 10 }, "floodThreshold": 0.02 },
-    { "id": "house-b", "position": { "x": 215, "y": 125 }, "footprint": { "w": 10, "h": 10 }, "floodThreshold": 0.02 },
-    { "id": "house-c", "position": { "x": 200, "y": 135 }, "footprint": { "w": 10, "h": 10 }, "floodThreshold": 0.02 }
+    { "id": "Miller's Cottage", "position": { "x": 200, "y": 115 }, "footprint": { "w": 10, "h": 10 }, "floodThreshold": 0.02 },
+    { "id": "The Bakery", "position": { "x": 215, "y": 125 }, "footprint": { "w": 10, "h": 10 }, "floodThreshold": 0.02 },
+    { "id": "Old Chapel", "position": { "x": 200, "y": 135 }, "footprint": { "w": 10, "h": 10 }, "floodThreshold": 0.02 }
   ],
   "resources": {
     "sandVolume": 1600,
