@@ -62,14 +62,20 @@ Tests are co-located: `src/core/Grid.test.js`, `src/core/EventBus.test.js`, `src
     "three": "0.172.0"
   },
   "devDependencies": {
-    "jsdom": "28.1.0",
-    "vite": "6.3.5",
-    "vitest": "4.1.0"
+    "jsdom": "VERIFY_LATEST",
+    "vite": "VERIFY_LATEST",
+    "vitest": "VERIFY_LATEST"
   }
 }
 ```
 
-Note: exact versions pinned (no `^`), per spec §12.4.
+Note: exact versions pinned (no `^`), per spec §12.4. **Before running npm install**, verify actual latest published versions:
+```bash
+npm info vitest version
+npm info vite version
+npm info jsdom version
+```
+Replace `VERIFY_LATEST` with the actual version numbers returned. Three.js 0.172.0 is confirmed.
 
 - [ ] **Step 2: Create vite.config.js**
 
@@ -146,7 +152,8 @@ export const STONE_BIT = 1;
 export const HOUSE_BIT = 2;
 
 // Dev mode — enables bounds checking in Grid accessors
-export const DEV_MODE = import.meta.env?.DEV ?? true;
+// import.meta.env.DEV is always defined in Vite/Vitest environments
+export const DEV_MODE = import.meta.env.DEV;
 ```
 
 - [ ] **Step 2: Write failing EventBus test**
@@ -670,17 +677,38 @@ describe('WaterSim', () => {
     expect(grid.waterDepth[east]).toBe(0);
   });
 
-  it('boundary cells have zero flux (closed basin)', () => {
-    // Put water at edge
+  it('boundary cells have zero outward flux (closed basin)', () => {
     const edge = grid.index(0, 4);
     grid.waterDepth[edge] = 1.0;
 
     sim.step(1 / 60);
 
-    // Water should not disappear (no outflow at boundary)
+    // West flux at x=0 must be zero (no outflow at west boundary)
+    expect(sim.flux[edge * 4 + 3]).toBe(0); // F_W = 3
+
+    // Total water conserved (no leaks at boundary)
     let total = 0;
     for (let i = 0; i < grid.cellCount; i++) total += grid.waterDepth[i];
     expect(total).toBeCloseTo(1.0, 4);
+  });
+
+  it('injectSource adds water capped at maxDepth', () => {
+    const source = {
+      position: { x: 4, y: 4 },
+      radius: 1,
+      flowRate: 0.5,
+      maxDepth: 0.8
+    };
+    sim.setSource(source);
+
+    // Inject enough to exceed maxDepth
+    for (let i = 0; i < 20; i++) {
+      sim._injectSource(1 / 60);
+    }
+
+    const center = grid.index(4, 4);
+    // Should be capped at maxDepth, not above
+    expect(grid.waterDepth[center]).toBeCloseTo(0.8, 4);
   });
 
   it('reset zeros water depth, flux, and velocity', () => {
@@ -710,8 +738,7 @@ Expected: FAIL — cannot import WaterSim
 import { STONE_BIT } from '../core/Constants.js';
 
 const GRAVITY = 9.81;
-const PIPE_AREA = 1.0;   // cross-section area of virtual pipe
-const MIN_DEPTH = 0.0001; // ignore cells with less water than this
+const PIPE_AREA = 1.0;
 
 // Flux layout: 4 floats per cell [N, S, E, W]
 const F_N = 0, F_S = 1, F_E = 2, F_W = 3;
@@ -720,10 +747,12 @@ export class WaterSim {
   constructor() {
     this.grid = null;
     this.flux = null;
+    this.fluxNew = null;  // double-buffer to avoid order-dependent updates
     this.velocity = null;
     this.substeps = 2;
     this.width = 0;
     this.height = 0;
+    this.source = null;
   }
 
   init(grid, levelConfig) {
@@ -733,155 +762,28 @@ export class WaterSim {
     const n = grid.cellCount;
 
     this.flux = new Float32Array(n * 4);
+    this.fluxNew = new Float32Array(n * 4);
     this.velocity = new Float32Array(n * 2);
     this.substeps = levelConfig.sim?.substepsPerFrame ?? 2;
+    this.source = levelConfig.waterSource ?? null;
+  }
+
+  /** Set or clear the water source (null to disable). */
+  setSource(source) {
+    this.source = source;
   }
 
   step(dt) {
     const subDt = dt / this.substeps;
     for (let s = 0; s < this.substeps; s++) {
+      this._injectSource(subDt);
       this._substep(subDt);
     }
   }
 
-  _substep(dt) {
-    const { grid, flux, width, height } = this;
-    const { terrainHeight, materialHeight, waterDepth, occupancy } = grid;
-    const cellCount = grid.cellCount;
-
-    // --- Update flux ---
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const i = y * width + x;
-        if ((occupancy[i] & STONE_BIT) !== 0) {
-          // Blocked cell: zero all flux
-          flux[i * 4 + F_N] = 0;
-          flux[i * 4 + F_S] = 0;
-          flux[i * 4 + F_E] = 0;
-          flux[i * 4 + F_W] = 0;
-          continue;
-        }
-
-        const surface = terrainHeight[i] + materialHeight[i];
-        const h = surface + waterDepth[i];
-
-        // Compute flux to each neighbor
-        // North (y-1)
-        if (y > 0) {
-          const ni = (y - 1) * width + x;
-          if ((occupancy[ni] & STONE_BIT) === 0) {
-            const nh = terrainHeight[ni] + materialHeight[ni] + waterDepth[ni];
-            const dh = h - nh;
-            flux[i * 4 + F_N] = Math.max(0, flux[i * 4 + F_N] + GRAVITY * PIPE_AREA * dh * dt);
-          } else {
-            flux[i * 4 + F_N] = 0;
-          }
-        } else {
-          flux[i * 4 + F_N] = 0;
-        }
-
-        // South (y+1)
-        if (y < height - 1) {
-          const ni = (y + 1) * width + x;
-          if ((occupancy[ni] & STONE_BIT) === 0) {
-            const nh = terrainHeight[ni] + materialHeight[ni] + waterDepth[ni];
-            const dh = h - nh;
-            flux[i * 4 + F_S] = Math.max(0, flux[i * 4 + F_S] + GRAVITY * PIPE_AREA * dh * dt);
-          } else {
-            flux[i * 4 + F_S] = 0;
-          }
-        } else {
-          flux[i * 4 + F_S] = 0;
-        }
-
-        // East (x+1)
-        if (x < width - 1) {
-          const ni = y * width + (x + 1);
-          if ((occupancy[ni] & STONE_BIT) === 0) {
-            const nh = terrainHeight[ni] + materialHeight[ni] + waterDepth[ni];
-            const dh = h - nh;
-            flux[i * 4 + F_E] = Math.max(0, flux[i * 4 + F_E] + GRAVITY * PIPE_AREA * dh * dt);
-          } else {
-            flux[i * 4 + F_E] = 0;
-          }
-        } else {
-          flux[i * 4 + F_E] = 0;
-        }
-
-        // West (x-1)
-        if (x > 0) {
-          const ni = y * width + (x - 1);
-          if ((occupancy[ni] & STONE_BIT) === 0) {
-            const nh = terrainHeight[ni] + materialHeight[ni] + waterDepth[ni];
-            const dh = h - nh;
-            flux[i * 4 + F_W] = Math.max(0, flux[i * 4 + F_W] + GRAVITY * PIPE_AREA * dh * dt);
-          } else {
-            flux[i * 4 + F_W] = 0;
-          }
-        } else {
-          flux[i * 4 + F_W] = 0;
-        }
-
-        // Clamp: total outflux must not exceed available water
-        const totalOut = flux[i * 4 + F_N] + flux[i * 4 + F_S]
-          + flux[i * 4 + F_E] + flux[i * 4 + F_W];
-        if (totalOut > 0) {
-          const maxOut = waterDepth[i] / dt;
-          if (totalOut > maxOut) {
-            const scale = maxOut / totalOut;
-            flux[i * 4 + F_N] *= scale;
-            flux[i * 4 + F_S] *= scale;
-            flux[i * 4 + F_E] *= scale;
-            flux[i * 4 + F_W] *= scale;
-          }
-        }
-      }
-    }
-
-    // --- Apply flux to update water depth ---
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const i = y * width + x;
-        if ((occupancy[i] & STONE_BIT) !== 0) continue;
-
-        let netFlux = 0;
-
-        // Outgoing
-        netFlux -= flux[i * 4 + F_N] + flux[i * 4 + F_S]
-          + flux[i * 4 + F_E] + flux[i * 4 + F_W];
-
-        // Incoming from neighbors
-        if (y > 0) netFlux += flux[((y - 1) * width + x) * 4 + F_S]; // neighbor's south = our north
-        if (y < height - 1) netFlux += flux[((y + 1) * width + x) * 4 + F_N];
-        if (x < width - 1) netFlux += flux[(y * width + x + 1) * 4 + F_W];
-        if (x > 0) netFlux += flux[(y * width + x - 1) * 4 + F_E];
-
-        waterDepth[i] += netFlux * dt;
-        if (waterDepth[i] < 0) waterDepth[i] = 0;
-      }
-    }
-
-    // --- Compute velocity from flux (for erosion) ---
-    const vel = this.velocity;
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const i = y * width + x;
-        const fi = i * 4;
-        // vx = (east_flux - west_flux) average
-        vel[i * 2] = (flux[fi + F_E] - flux[fi + F_W]) * 0.5;
-        // vy = (south_flux - north_flux) average
-        vel[i * 2 + 1] = (flux[fi + F_S] - flux[fi + F_N]) * 0.5;
-      }
-    }
-  }
-
-  /**
-   * Inject water at source cells.
-   * Call this each frame during flood phase, before step().
-   */
-  injectSource(source, dt) {
+  _injectSource(dt) {
+    const { source, grid } = this;
     if (!source) return;
-    const { grid } = this;
     const { position, radius, flowRate, maxDepth } = source;
     const cx = position.x, cy = position.y;
     const r2 = radius * radius;
@@ -892,9 +794,140 @@ export class WaterSim {
         const x = cx + dx, y = cy + dy;
         if (!grid.inBounds(x, y)) continue;
         const i = grid.index(x, y);
-        if (grid.waterDepth[i] < maxDepth) {
-          grid.waterDepth[i] += flowRate * dt;
+        grid.waterDepth[i] = Math.min(
+          grid.waterDepth[i] + flowRate * dt,
+          maxDepth
+        );
+      }
+    }
+  }
+
+  _substep(dt) {
+    const { grid, flux, fluxNew, width, height } = this;
+    const { terrainHeight, materialHeight, waterDepth, occupancy } = grid;
+
+    // --- Compute new flux into fluxNew (double-buffered) ---
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const i = y * width + x;
+        const fi = i * 4;
+
+        if ((occupancy[i] & STONE_BIT) !== 0) {
+          fluxNew[fi + F_N] = 0;
+          fluxNew[fi + F_S] = 0;
+          fluxNew[fi + F_E] = 0;
+          fluxNew[fi + F_W] = 0;
+          continue;
         }
+
+        const h = terrainHeight[i] + materialHeight[i] + waterDepth[i];
+
+        // North (y-1)
+        if (y > 0) {
+          const ni = (y - 1) * width + x;
+          if ((occupancy[ni] & STONE_BIT) === 0) {
+            const nh = terrainHeight[ni] + materialHeight[ni] + waterDepth[ni];
+            fluxNew[fi + F_N] = Math.max(0, flux[fi + F_N] + GRAVITY * PIPE_AREA * (h - nh) * dt);
+          } else {
+            fluxNew[fi + F_N] = 0;
+          }
+        } else {
+          fluxNew[fi + F_N] = 0;
+        }
+
+        // South (y+1)
+        if (y < height - 1) {
+          const ni = (y + 1) * width + x;
+          if ((occupancy[ni] & STONE_BIT) === 0) {
+            const nh = terrainHeight[ni] + materialHeight[ni] + waterDepth[ni];
+            fluxNew[fi + F_S] = Math.max(0, flux[fi + F_S] + GRAVITY * PIPE_AREA * (h - nh) * dt);
+          } else {
+            fluxNew[fi + F_S] = 0;
+          }
+        } else {
+          fluxNew[fi + F_S] = 0;
+        }
+
+        // East (x+1)
+        if (x < width - 1) {
+          const ni = y * width + (x + 1);
+          if ((occupancy[ni] & STONE_BIT) === 0) {
+            const nh = terrainHeight[ni] + materialHeight[ni] + waterDepth[ni];
+            fluxNew[fi + F_E] = Math.max(0, flux[fi + F_E] + GRAVITY * PIPE_AREA * (h - nh) * dt);
+          } else {
+            fluxNew[fi + F_E] = 0;
+          }
+        } else {
+          fluxNew[fi + F_E] = 0;
+        }
+
+        // West (x-1)
+        if (x > 0) {
+          const ni = y * width + (x - 1);
+          if ((occupancy[ni] & STONE_BIT) === 0) {
+            const nh = terrainHeight[ni] + materialHeight[ni] + waterDepth[ni];
+            fluxNew[fi + F_W] = Math.max(0, flux[fi + F_W] + GRAVITY * PIPE_AREA * (h - nh) * dt);
+          } else {
+            fluxNew[fi + F_W] = 0;
+          }
+        } else {
+          fluxNew[fi + F_W] = 0;
+        }
+
+        // Clamp: total outflux must not exceed available water
+        const totalOut = fluxNew[fi + F_N] + fluxNew[fi + F_S]
+          + fluxNew[fi + F_E] + fluxNew[fi + F_W];
+        if (totalOut > 0) {
+          const maxOut = waterDepth[i] / dt;
+          if (totalOut > maxOut) {
+            const scale = maxOut / totalOut;
+            fluxNew[fi + F_N] *= scale;
+            fluxNew[fi + F_S] *= scale;
+            fluxNew[fi + F_E] *= scale;
+            fluxNew[fi + F_W] *= scale;
+          }
+        }
+      }
+    }
+
+    // --- Swap buffers: fluxNew becomes current flux ---
+    const tmp = this.flux;
+    this.flux = fluxNew;
+    this.fluxNew = tmp;
+    const activeFlux = this.flux;
+
+    // --- Apply flux to update water depth ---
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const i = y * width + x;
+        if ((occupancy[i] & STONE_BIT) !== 0) continue;
+
+        const fi = i * 4;
+        let netFlux = 0;
+
+        // Outgoing
+        netFlux -= activeFlux[fi + F_N] + activeFlux[fi + F_S]
+          + activeFlux[fi + F_E] + activeFlux[fi + F_W];
+
+        // Incoming from neighbors
+        if (y > 0) netFlux += activeFlux[((y - 1) * width + x) * 4 + F_S];
+        if (y < height - 1) netFlux += activeFlux[((y + 1) * width + x) * 4 + F_N];
+        if (x < width - 1) netFlux += activeFlux[(y * width + x + 1) * 4 + F_W];
+        if (x > 0) netFlux += activeFlux[(y * width + x - 1) * 4 + F_E];
+
+        waterDepth[i] += netFlux * dt;
+        if (waterDepth[i] < 0) waterDepth[i] = 0;
+      }
+    }
+
+    // --- Compute velocity from flux (for erosion, consumed in milestone 3) ---
+    const vel = this.velocity;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const i = y * width + x;
+        const fi = i * 4;
+        vel[i * 2] = (activeFlux[fi + F_E] - activeFlux[fi + F_W]) * 0.5;
+        vel[i * 2 + 1] = (activeFlux[fi + F_S] - activeFlux[fi + F_N]) * 0.5;
       }
     }
   }
@@ -902,6 +935,7 @@ export class WaterSim {
   reset() {
     this.grid.waterDepth.fill(0);
     this.flux.fill(0);
+    this.fluxNew.fill(0);
     this.velocity.fill(0);
   }
 }
@@ -910,7 +944,7 @@ export class WaterSim {
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run src/sim/WaterSim.test.js`
-Expected: All 6 tests PASS
+Expected: All 7 tests PASS
 
 - [ ] **Step 5: Commit**
 
@@ -932,7 +966,6 @@ No unit test for this module — it's Three.js wiring that requires a real canva
 
 ```js
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 export class SceneBuilder {
   constructor(container) {
@@ -1112,6 +1145,13 @@ export class WaterMesh {
     );
     this.geometry.rotateX(-Math.PI / 2);
 
+    // Set all normals to face up — no per-frame recomputation needed
+    const normals = this.geometry.attributes.normal;
+    for (let i = 0; i < normals.count; i++) {
+      normals.setXYZ(i, 0, 1, 0);
+    }
+    normals.needsUpdate = true;
+
     this.material = new THREE.MeshPhysicalMaterial({
       color: 0x3388cc,
       transparent: true,
@@ -1146,7 +1186,7 @@ export class WaterMesh {
     }
 
     pos.needsUpdate = true;
-    this.geometry.computeVertexNormals();
+    // Normals are static (0,1,0) — no recomputation needed per frame
   }
 }
 ```
@@ -1388,6 +1428,7 @@ async function main() {
   container.appendChild(fpsDisplay);
 
   // Auto-start water for milestone 1 (no game loop yet)
+  // Source is already set via init(); step() handles per-substep injection
   let simActive = true;
 
   // Render loop
@@ -1398,7 +1439,6 @@ async function main() {
     lastTime = now;
 
     if (simActive) {
-      waterSim.injectSource(config.waterSource, dt);
       waterSim.step(dt);
       water.update();
     }
