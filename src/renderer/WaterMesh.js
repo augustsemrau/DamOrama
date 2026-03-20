@@ -25,11 +25,11 @@ export class WaterMesh {
     normals.needsUpdate = true;
 
     this.material = new THREE.MeshPhysicalMaterial({
-      color: 0x3388cc,
+      color: 0x2288dd,
       transparent: true,
-      opacity: 0.6,
-      roughness: 0.1,
-      metalness: 0.0,
+      opacity: 0.7,
+      roughness: 0.15,
+      metalness: 0.1,
       side: THREE.DoubleSide,
       depthWrite: false
     });

@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 
-export function createBasinWalls(scene, worldSize, wallHeight = 0.8) {
+export function createBasinWalls(scene, worldSize, wallHeight = 1.0) {
   const half = worldSize / 2;
   const material = new THREE.MeshStandardMaterial({
-    color: 0x6b5b4f,
-    roughness: 0.9,
+    color: 0x8B7355,
+    roughness: 0.85,
     side: THREE.DoubleSide
   });
 

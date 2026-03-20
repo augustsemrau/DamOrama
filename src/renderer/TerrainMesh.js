@@ -53,19 +53,24 @@ export class TerrainMesh {
 
         pos.setY(vi, h);
 
-        // Normalize to 0–1 across actual terrain range
-        const t = (h - minH) / range;
-        // Low terrain (valley floor): darker green-brown
-        // High terrain (rims): lighter sandy brown
-        // Player material: slightly lighter to distinguish
+        const t = (h - minH) / range; // 0=valley floor, 1=rim
         const hasMat = grid.materialHeight[gi] > 0;
-        if (hasMat) {
-          // Player-placed material: distinct tan/gold
-          col.setXYZ(vi, 0.72, 0.60, 0.35);
+        const matId = grid.materialId[gi];
+
+        if (hasMat && matId === 1) {
+          // Sand: warm golden
+          col.setXYZ(vi, 0.82, 0.68, 0.35);
+        } else if (hasMat && matId === 2) {
+          // Clay: reddish brown
+          col.setXYZ(vi, 0.62, 0.42, 0.28);
+        } else if (hasMat && matId === 3) {
+          // Stone: gray
+          col.setXYZ(vi, 0.55, 0.55, 0.52);
         } else {
-          const r = 0.35 + t * 0.25;
-          const g = 0.30 + t * 0.18;
-          const b = 0.15 + t * 0.08;
+          // Natural terrain: dark olive valley → warm brown rim
+          const r = 0.28 + t * 0.30;
+          const g = 0.26 + t * 0.16;
+          const b = 0.12 + t * 0.10;
           col.setXYZ(vi, r, g, b);
         }
       }

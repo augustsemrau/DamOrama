@@ -6,7 +6,7 @@
     "type": "procedural",
     "profile": "single_valley",
     "flowDirection": "west_to_east",
-    "valleyWidth": 56,
+    "valleyWidth": 70,
     "valleyDepth": 0.35
   },
   "waterSource": {
@@ -19,9 +19,9 @@
     "startDelaySec": 0
   },
   "houses": [
-    { "id": "house-a", "position": { "x": 208, "y": 108 }, "footprint": { "w": 10, "h": 10 }, "floodThreshold": 0.03 },
-    { "id": "house-b", "position": { "x": 220, "y": 128 }, "footprint": { "w": 10, "h": 10 }, "floodThreshold": 0.03 },
-    { "id": "house-c", "position": { "x": 208, "y": 148 }, "footprint": { "w": 10, "h": 10 }, "floodThreshold": 0.03 }
+    { "id": "house-a", "position": { "x": 200, "y": 115 }, "footprint": { "w": 10, "h": 10 }, "floodThreshold": 0.02 },
+    { "id": "house-b", "position": { "x": 215, "y": 125 }, "footprint": { "w": 10, "h": 10 }, "floodThreshold": 0.02 },
+    { "id": "house-c", "position": { "x": 200, "y": 135 }, "footprint": { "w": 10, "h": 10 }, "floodThreshold": 0.02 }
   ],
   "resources": {
     "sandVolume": 1600,
@@ -36,7 +36,7 @@
     "settleTimeSec": 8
   },
   "camera": {
-    "initialPosition": { "x": 12, "y": 14, "z": 12 },
+    "initialPosition": { "x": -2, "y": 12, "z": 20 },
     "lookAt": { "x": 8, "y": 0, "z": 8 }
   }
 }

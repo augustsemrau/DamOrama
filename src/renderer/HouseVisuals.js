@@ -1,17 +1,12 @@
 import * as THREE from 'three';
 import { HOUSE_BIT } from '../core/Constants.js';
 
-const DRY_COLOR = 0xe8a547;    // warm, saturated
-const FLOODED_COLOR = 0x666666; // desaturated gray
+const DRY_WALL = 0xf5e6c8;    // warm cream walls
+const DRY_ROOF = 0xc0392b;    // red roof
+const FLOODED_WALL = 0x777777;
+const FLOODED_ROOF = 0x555555;
 
 export class HouseVisuals {
-  /**
-   * @param {THREE.Scene} scene
-   * @param {Grid} grid
-   * @param {number} cellSize
-   * @param {Array} housesConfig — from level JSON
-   * @param {EventBus} eventBus
-   */
   constructor(scene, grid, cellSize, housesConfig, eventBus) {
     this._houses = [];
 
@@ -20,22 +15,38 @@ export class HouseVisuals {
       const worldZ = (hc.position.y + hc.footprint.h / 2) * cellSize;
       const worldW = hc.footprint.w * cellSize;
       const worldH = hc.footprint.h * cellSize;
-      const height = 0.3;
+      const wallHeight = 0.25;
+      const roofHeight = 0.15;
 
-      // Get terrain height at house center for Y position
       const centerI = grid.index(
         Math.min(hc.position.x + Math.floor(hc.footprint.w / 2), grid.width - 1),
         Math.min(hc.position.y + Math.floor(hc.footprint.h / 2), grid.height - 1)
       );
       const baseY = grid.terrainHeight[centerI];
 
-      const geo = new THREE.BoxGeometry(worldW, height, worldH);
-      const mat = new THREE.MeshStandardMaterial({ color: DRY_COLOR });
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.position.set(worldX, baseY + height / 2, worldZ);
-      scene.add(mesh);
+      // House group
+      const group = new THREE.Group();
+      group.position.set(worldX, baseY, worldZ);
 
-      // Mark footprint cells in grid
+      // Walls
+      const wallGeo = new THREE.BoxGeometry(worldW, wallHeight, worldH);
+      const wallMat = new THREE.MeshStandardMaterial({ color: DRY_WALL });
+      const walls = new THREE.Mesh(wallGeo, wallMat);
+      walls.position.y = wallHeight / 2;
+      group.add(walls);
+
+      // Roof (pyramid-like using a cone)
+      const roofSize = Math.max(worldW, worldH) * 1.15;
+      const roofGeo = new THREE.ConeGeometry(roofSize * 0.7, roofHeight, 4);
+      const roofMat = new THREE.MeshStandardMaterial({ color: DRY_ROOF });
+      const roof = new THREE.Mesh(roofGeo, roofMat);
+      roof.position.y = wallHeight + roofHeight / 2;
+      roof.rotation.y = Math.PI / 4;
+      group.add(roof);
+
+      scene.add(group);
+
+      // Mark footprint cells
       for (let dy = 0; dy < hc.footprint.h; dy++) {
         for (let dx = 0; dx < hc.footprint.w; dx++) {
           const gx = hc.position.x + dx;
@@ -46,24 +57,27 @@ export class HouseVisuals {
         }
       }
 
-      this._houses.push({ id: hc.id, mesh, mat, config: hc, flooded: false });
+      this._houses.push({
+        id: hc.id, group, wallMat, roofMat,
+        config: hc, flooded: false
+      });
     }
 
-    // Listen for flood state changes
     eventBus.on('house-flooded', (data) => {
       const house = this._houses.find(h => h.id === data.houseId);
       if (house && !house.flooded) {
         house.flooded = true;
-        house.mat.color.setHex(FLOODED_COLOR);
+        house.wallMat.color.setHex(FLOODED_WALL);
+        house.roofMat.color.setHex(FLOODED_ROOF);
       }
     });
 
     eventBus.on('phase-changed', (data) => {
       if (data.phase === 'construction') {
-        // Reset all houses to dry
         for (const h of this._houses) {
           h.flooded = false;
-          h.mat.color.setHex(DRY_COLOR);
+          h.wallMat.color.setHex(DRY_WALL);
+          h.roofMat.color.setHex(DRY_ROOF);
         }
       }
     });

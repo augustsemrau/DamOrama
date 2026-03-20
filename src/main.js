@@ -68,6 +68,24 @@ async function main() {
   const terrain = new TerrainMesh(grid, cellSize, eventBus);
   scene.scene.add(terrain.mesh);
 
+  // Water source indicator (blue ring showing where water emerges)
+  const srcX = (config.waterSource.position.x) * cellSize;
+  const srcZ = (config.waterSource.position.y) * cellSize;
+  const srcR = config.waterSource.radius * cellSize;
+  const srcGeo = new (await import('three')).RingGeometry(srcR * 0.6, srcR * 1.2, 24);
+  srcGeo.rotateX(-Math.PI / 2);
+  const srcMat = new (await import('three')).MeshBasicMaterial({
+    color: 0x4488ff, transparent: true, opacity: 0.4, side: 2
+  });
+  const srcMarker = new (await import('three')).Mesh(srcGeo, srcMat);
+  srcMarker.position.set(srcX, 0.62, srcZ);
+  scene.scene.add(srcMarker);
+
+  // Hide source marker during flood (water is visible enough)
+  eventBus.on('phase-changed', (d) => {
+    srcMarker.visible = d.phase === 'construction';
+  });
+
   // Water
   const water = new WaterMesh(grid, cellSize);
   scene.scene.add(water.mesh);
