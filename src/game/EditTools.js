@@ -39,11 +39,15 @@ export class EditTools {
           budget.spend(MAT_STONE, 1);
           totalSpent += 1;
         } else {
-          // Sand/Clay: add height, spend volume
-          const amount = 1; // 1 volume unit per cell per stroke
+          // Sand/Clay: add height, spend volume, cap at maxHeight
+          if (grid.materialHeight[i] >= (props.maxHeight || 1.0)) continue;
+          const amount = 1;
           if (!budget.canAfford(materialId, amount)) continue;
           if (undoSystem) undoSystem.recordCell(i, grid);
-          grid.materialHeight[i] += props.placementHeight;
+          grid.materialHeight[i] = Math.min(
+            grid.materialHeight[i] + props.placementHeight,
+            props.maxHeight || 1.0
+          );
           grid.materialId[i] = materialId;
           budget.spend(materialId, amount);
           totalSpent += amount;

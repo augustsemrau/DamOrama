@@ -1,37 +1,37 @@
 {
   "id": "level-01",
   "name": "The Basin",
-  "grid": { "width": 128, "height": 128, "cellSize": 0.125 },
+  "grid": { "width": 256, "height": 256, "cellSize": 0.0625 },
   "terrain": {
     "type": "procedural",
     "profile": "single_valley",
     "flowDirection": "west_to_east",
-    "valleyWidth": 28,
-    "valleyDepth": 0.22
+    "valleyWidth": 56,
+    "valleyDepth": 0.35
   },
   "waterSource": {
     "type": "pipe",
-    "position": { "x": 14, "y": 64 },
-    "radius": 3,
-    "flowRate": 0.014,
+    "position": { "x": 28, "y": 128 },
+    "radius": 6,
+    "flowRate": 0.08,
     "maxDepth": 2.0,
-    "durationSec": 18,
+    "durationSec": 20,
     "startDelaySec": 0
   },
   "houses": [
-    { "id": "house-a", "position": { "x": 104, "y": 54 }, "footprint": { "w": 5, "h": 5 }, "floodThreshold": 0.05 },
-    { "id": "house-b", "position": { "x": 110, "y": 64 }, "footprint": { "w": 5, "h": 5 }, "floodThreshold": 0.05 },
-    { "id": "house-c", "position": { "x": 104, "y": 74 }, "footprint": { "w": 5, "h": 5 }, "floodThreshold": 0.05 }
+    { "id": "house-a", "position": { "x": 208, "y": 108 }, "footprint": { "w": 10, "h": 10 }, "floodThreshold": 0.03 },
+    { "id": "house-b", "position": { "x": 220, "y": 128 }, "footprint": { "w": 10, "h": 10 }, "floodThreshold": 0.03 },
+    { "id": "house-c", "position": { "x": 208, "y": 148 }, "footprint": { "w": 10, "h": 10 }, "floodThreshold": 0.03 }
   ],
   "resources": {
-    "sandVolume": 800,
-    "clayVolume": 450,
-    "stoneBlocks": 6
+    "sandVolume": 1600,
+    "clayVolume": 900,
+    "stoneBlocks": 8
   },
   "sim": {
     "substepsPerFrame": 2,
-    "erosionThreshold": 0.35,
-    "erosionRateSand": 0.003,
+    "erosionThreshold": 0.2,
+    "erosionRateSand": 0.005,
     "erosionRateClay": 0.001,
     "settleTimeSec": 8
   },

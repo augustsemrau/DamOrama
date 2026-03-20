@@ -2,7 +2,15 @@
   "permissions": {
     "allow": [
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git ls-tree:*)",
+      "Bash(npm info:*)",
+      "Bash(npm install:*)",
+      "Bash(npx vitest:*)",
+      "Bash(conda run:*)",
+      "Bash(pkill -f \"vite --port 5173\")",
+      "Bash(pkill -f \"vite --port\")",
+      "Bash(npx vite:*)"
     ]
   }
 }

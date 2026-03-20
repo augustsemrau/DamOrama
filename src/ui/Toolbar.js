@@ -12,7 +12,7 @@ export class Toolbar {
   constructor(container, eventBus) {
     this._bus = eventBus;
     this._activeTool = TOOLS[0];
-    this._brushSize = 2;
+    this._brushSize = 4;
 
     this._el = document.createElement('div');
     this._el.style.cssText =

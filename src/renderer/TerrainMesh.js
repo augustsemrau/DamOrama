@@ -36,6 +36,15 @@ export class TerrainMesh {
     const { grid } = this;
     const { width, height } = grid;
 
+    // Find height range for color normalization
+    let minH = Infinity, maxH = -Infinity;
+    for (let i = 0; i < grid.cellCount; i++) {
+      const h = grid.getSurfaceHeight(i);
+      if (h < minH) minH = h;
+      if (h > maxH) maxH = h;
+    }
+    const range = maxH - minH || 1;
+
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const vi = y * width + x;
@@ -44,11 +53,21 @@ export class TerrainMesh {
 
         pos.setY(vi, h);
 
-        const t = Math.min(h / 0.6, 1.0);
-        const r = 0.45 + t * 0.2;
-        const g = 0.35 + t * 0.15;
-        const b = 0.2 + t * 0.05;
-        col.setXYZ(vi, r, g, b);
+        // Normalize to 0–1 across actual terrain range
+        const t = (h - minH) / range;
+        // Low terrain (valley floor): darker green-brown
+        // High terrain (rims): lighter sandy brown
+        // Player material: slightly lighter to distinguish
+        const hasMat = grid.materialHeight[gi] > 0;
+        if (hasMat) {
+          // Player-placed material: distinct tan/gold
+          col.setXYZ(vi, 0.72, 0.60, 0.35);
+        } else {
+          const r = 0.35 + t * 0.25;
+          const g = 0.30 + t * 0.18;
+          const b = 0.15 + t * 0.08;
+          col.setXYZ(vi, r, g, b);
+        }
       }
     }
 
