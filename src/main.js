@@ -1,27 +1,34 @@
 import { EventBus } from './core/EventBus.js';
 import { Level } from './game/Level.js';
 import { GameLoop } from './game/GameLoop.js';
+import { ResourceBudget } from './game/ResourceBudget.js';
+import { EditTools } from './game/EditTools.js';
+import { UndoSystem } from './game/UndoSystem.js';
 import { WaterSim } from './sim/WaterSim.js';
+import { Erosion } from './sim/Erosion.js';
 import { SceneBuilder } from './renderer/SceneBuilder.js';
 import { TerrainMesh } from './renderer/TerrainMesh.js';
 import { WaterMesh } from './renderer/WaterMesh.js';
 import { CameraControls } from './input/CameraControls.js';
+import { PointerInput } from './input/PointerInput.js';
 import { createBasinWalls } from './renderer/BasinWalls.js';
 import { PhaseControls } from './ui/PhaseControls.js';
+import { Toolbar } from './ui/Toolbar.js';
+import { BudgetDisplay } from './ui/BudgetDisplay.js';
 import levelData from './levels/level-01.json';
 
-// Keep initial terrain for reset
 let initialTerrainHeight = null;
 
 function saveInitialTerrain(grid) {
   initialTerrainHeight = new Float32Array(grid.terrainHeight);
 }
 
-function resetAll(grid, waterSim, waterMesh, terrainMesh, eventBus) {
-  // Restore terrain to initial state
+function resetAll(grid, waterSim, budget, undoSystem, waterMesh, eventBus) {
   grid.terrainHeight.set(initialTerrainHeight);
-  grid.reset(); // zeros materialHeight, waterDepth, materialId, occupancy
+  grid.reset();
   waterSim.reset();
+  budget.reset();
+  undoSystem.clear();
   waterMesh.update();
   eventBus.emit('terrain-changed');
 }
@@ -38,10 +45,16 @@ async function main() {
   // Water simulation — source disabled until flood phase
   const waterSim = new WaterSim();
   waterSim.init(grid, config);
-  waterSim.setSource(null); // disabled in construction
+  waterSim.setSource(null);
 
-  // Game loop
+  // Erosion
+  const erosion = new Erosion(grid, eventBus, config.sim);
+
+  // Game systems
   const gameLoop = new GameLoop(eventBus, config);
+  const budget = new ResourceBudget(eventBus, config.resources);
+  const editTools = new EditTools(grid, eventBus);
+  const undoSystem = new UndoSystem();
 
   // Renderer
   const container = document.getElementById('app');
@@ -63,21 +76,30 @@ async function main() {
     scene.camera, scene.canvas, config.camera
   );
 
-  // Phase controls UI
+  // Input
+  new PointerInput(
+    scene.canvas, scene.camera, grid, cellSize,
+    editTools, budget, undoSystem, eventBus
+  );
+
+  // UI
+  new Toolbar(container, eventBus);
+  new BudgetDisplay(container, eventBus, budget.snapshot());
+
   new PhaseControls(container, eventBus, {
     onStartFlood: () => {
-      waterSim.setSource(config.waterSource); // enable source
+      waterSim.setSource(config.waterSource);
       gameLoop.startFlood();
     },
     onRetry: () => {
       gameLoop.retry(() => {
-        waterSim.setSource(null); // disable source
-        resetAll(grid, waterSim, water, terrain, eventBus);
+        waterSim.setSource(null);
+        resetAll(grid, waterSim, budget, undoSystem, water, eventBus);
       });
     }
   });
 
-  // --- FPS measurement ---
+  // FPS display
   let frameCount = 0;
   let fpsAccum = 0;
   const fpsDisplay = document.createElement('div');
@@ -92,23 +114,20 @@ async function main() {
     const dt = Math.min((now - lastTime) / 1000, 0.05);
     lastTime = now;
 
-    // Game phase update
     gameLoop.update(dt);
 
-    // Water sim runs only during flood phase
     if (gameLoop.phase === 'flood') {
-      // Disable source injection once duration expires
       if (!gameLoop.isSourceActive()) {
         waterSim.setSource(null);
       }
       waterSim.step(dt);
+      erosion.step(waterSim.velocity, dt);
       water.update();
     }
 
     camControls.update();
     scene.render();
 
-    // FPS counter
     frameCount++;
     fpsAccum += dt;
     if (fpsAccum >= 1.0) {
