@@ -1,0 +1,42 @@
+{
+  "id": "level-01",
+  "name": "The Basin",
+  "grid": { "width": 128, "height": 128, "cellSize": 0.125 },
+  "terrain": {
+    "type": "procedural",
+    "profile": "single_valley",
+    "flowDirection": "west_to_east",
+    "valleyWidth": 28,
+    "valleyDepth": 0.22
+  },
+  "waterSource": {
+    "type": "pipe",
+    "position": { "x": 14, "y": 64 },
+    "radius": 3,
+    "flowRate": 0.014,
+    "maxDepth": 2.0,
+    "durationSec": 18,
+    "startDelaySec": 0
+  },
+  "houses": [
+    { "id": "house-a", "position": { "x": 104, "y": 54 }, "footprint": { "w": 5, "h": 5 }, "floodThreshold": 0.05 },
+    { "id": "house-b", "position": { "x": 110, "y": 64 }, "footprint": { "w": 5, "h": 5 }, "floodThreshold": 0.05 },
+    { "id": "house-c", "position": { "x": 104, "y": 74 }, "footprint": { "w": 5, "h": 5 }, "floodThreshold": 0.05 }
+  ],
+  "resources": {
+    "sandVolume": 800,
+    "clayVolume": 450,
+    "stoneBlocks": 6
+  },
+  "sim": {
+    "substepsPerFrame": 2,
+    "erosionThreshold": 0.35,
+    "erosionRateSand": 0.003,
+    "erosionRateClay": 0.001,
+    "settleTimeSec": 8
+  },
+  "camera": {
+    "initialPosition": { "x": 12, "y": 14, "z": 12 },
+    "lookAt": { "x": 8, "y": 0, "z": 8 }
+  }
+}
