@@ -6,22 +6,22 @@
     "type": "procedural",
     "profile": "single_valley",
     "flowDirection": "west_to_east",
-    "valleyWidth": 70,
-    "valleyDepth": 0.35
+    "valleyWidth": 50,
+    "valleyDepth": 0.5
   },
   "waterSource": {
     "type": "pipe",
     "position": { "x": 28, "y": 128 },
     "radius": 8,
-    "flowRate": 0.15,
-    "maxDepth": 2.0,
-    "durationSec": 20,
+    "flowRate": 0.35,
+    "maxDepth": 1.5,
+    "durationSec": 25,
     "startDelaySec": 0
   },
   "houses": [
-    { "id": "Miller's Cottage", "position": { "x": 200, "y": 115 }, "footprint": { "w": 10, "h": 10 }, "floodThreshold": 0.02 },
-    { "id": "The Bakery", "position": { "x": 215, "y": 125 }, "footprint": { "w": 10, "h": 10 }, "floodThreshold": 0.02 },
-    { "id": "Old Chapel", "position": { "x": 200, "y": 135 }, "footprint": { "w": 10, "h": 10 }, "floodThreshold": 0.02 }
+    { "id": "Miller's Cottage", "position": { "x": 128, "y": 118 }, "footprint": { "w": 10, "h": 10 }, "floodThreshold": 0.005 },
+    { "id": "The Bakery", "position": { "x": 142, "y": 128 }, "footprint": { "w": 10, "h": 10 }, "floodThreshold": 0.005 },
+    { "id": "Old Chapel", "position": { "x": 128, "y": 138 }, "footprint": { "w": 10, "h": 10 }, "floodThreshold": 0.005 }
   ],
   "resources": {
     "sandVolume": 1600,

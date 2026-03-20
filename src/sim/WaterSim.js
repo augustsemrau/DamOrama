@@ -1,7 +1,9 @@
 import { STONE_BIT } from '../core/Constants.js';
 
 const GRAVITY = 9.81;
-const PIPE_AREA = 1.0;
+const PIPE_AREA = 1.0;        // full pipe area — water flows fast downhill
+const DAMPING = 1.0;          // no damping
+const MIN_FLOW_DEPTH = 0.001; // water below this doesn't flow
 
 // Flux layout: 4 floats per cell [N, S, E, W]
 const F_N = 0, F_S = 1, F_E = 2, F_W = 3;
@@ -10,7 +12,7 @@ export class WaterSim {
   constructor() {
     this.grid = null;
     this.flux = null;
-    this.fluxNew = null;  // double-buffer to avoid order-dependent updates
+    this.fluxNew = null;
     this.velocity = null;
     this.substeps = 2;
     this.width = 0;
@@ -27,7 +29,7 @@ export class WaterSim {
     this.flux = new Float32Array(n * 4);
     this.fluxNew = new Float32Array(n * 4);
     this.velocity = new Float32Array(n * 2);
-    this.substeps = levelConfig.sim?.substepsPerFrame ?? 2;
+    this.substeps = levelConfig.sim?.substepsPerFrame ?? 3;
     this.source = levelConfig.waterSource ?? null;
   }
 
@@ -82,61 +84,48 @@ export class WaterSim {
           continue;
         }
 
+        // Don't propagate flow from cells with very thin water film
+        if (waterDepth[i] < MIN_FLOW_DEPTH) {
+          fluxNew[fi + F_N] = 0;
+          fluxNew[fi + F_S] = 0;
+          fluxNew[fi + F_E] = 0;
+          fluxNew[fi + F_W] = 0;
+          continue;
+        }
+
         const h = terrainHeight[i] + materialHeight[i] + waterDepth[i];
 
+        // Helper: compute flux for one direction
+        const computeFlux = (ni, prevFlux) => {
+          if ((occupancy[ni] & STONE_BIT) !== 0) return 0;
+          const nh = terrainHeight[ni] + materialHeight[ni] + waterDepth[ni];
+          const dh = h - nh;
+          // Apply damping to previous flux + pressure-driven acceleration
+          const newFlux = prevFlux * DAMPING + GRAVITY * PIPE_AREA * dh * dt;
+          return Math.max(0, newFlux);
+        };
+
         // North (y-1)
-        if (y > 0) {
-          const ni = (y - 1) * width + x;
-          if ((occupancy[ni] & STONE_BIT) === 0) {
-            const nh = terrainHeight[ni] + materialHeight[ni] + waterDepth[ni];
-            fluxNew[fi + F_N] = Math.max(0, flux[fi + F_N] + GRAVITY * PIPE_AREA * (h - nh) * dt);
-          } else {
-            fluxNew[fi + F_N] = 0;
-          }
-        } else {
-          fluxNew[fi + F_N] = 0;
-        }
+        fluxNew[fi + F_N] = y > 0
+          ? computeFlux((y - 1) * width + x, flux[fi + F_N])
+          : 0;
 
         // South (y+1)
-        if (y < height - 1) {
-          const ni = (y + 1) * width + x;
-          if ((occupancy[ni] & STONE_BIT) === 0) {
-            const nh = terrainHeight[ni] + materialHeight[ni] + waterDepth[ni];
-            fluxNew[fi + F_S] = Math.max(0, flux[fi + F_S] + GRAVITY * PIPE_AREA * (h - nh) * dt);
-          } else {
-            fluxNew[fi + F_S] = 0;
-          }
-        } else {
-          fluxNew[fi + F_S] = 0;
-        }
+        fluxNew[fi + F_S] = y < height - 1
+          ? computeFlux((y + 1) * width + x, flux[fi + F_S])
+          : 0;
 
         // East (x+1)
-        if (x < width - 1) {
-          const ni = y * width + (x + 1);
-          if ((occupancy[ni] & STONE_BIT) === 0) {
-            const nh = terrainHeight[ni] + materialHeight[ni] + waterDepth[ni];
-            fluxNew[fi + F_E] = Math.max(0, flux[fi + F_E] + GRAVITY * PIPE_AREA * (h - nh) * dt);
-          } else {
-            fluxNew[fi + F_E] = 0;
-          }
-        } else {
-          fluxNew[fi + F_E] = 0;
-        }
+        fluxNew[fi + F_E] = x < width - 1
+          ? computeFlux(y * width + (x + 1), flux[fi + F_E])
+          : 0;
 
         // West (x-1)
-        if (x > 0) {
-          const ni = y * width + (x - 1);
-          if ((occupancy[ni] & STONE_BIT) === 0) {
-            const nh = terrainHeight[ni] + materialHeight[ni] + waterDepth[ni];
-            fluxNew[fi + F_W] = Math.max(0, flux[fi + F_W] + GRAVITY * PIPE_AREA * (h - nh) * dt);
-          } else {
-            fluxNew[fi + F_W] = 0;
-          }
-        } else {
-          fluxNew[fi + F_W] = 0;
-        }
+        fluxNew[fi + F_W] = x > 0
+          ? computeFlux(y * width + (x - 1), flux[fi + F_W])
+          : 0;
 
-        // Clamp total outflux
+        // Clamp total outflux to available water
         const totalOut = fluxNew[fi + F_N] + fluxNew[fi + F_S]
           + fluxNew[fi + F_E] + fluxNew[fi + F_W];
         if (totalOut > 0) {

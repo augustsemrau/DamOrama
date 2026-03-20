@@ -45,6 +45,10 @@ async function main() {
   const { grid, config } = Level.load(levelData);
   const cellSize = config.grid.cellSize;
   const worldSize = grid.width * cellSize;
+
+  // Debug: expose grid for browser console inspection
+  window.__grid = grid;
+  window.__config = config;
   saveInitialTerrain(grid);
 
   // Water simulation — source disabled until flood phase

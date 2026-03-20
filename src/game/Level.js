@@ -25,23 +25,22 @@ export class Level {
     const centerY = height / 2;
     const halfValley = terrain.valleyWidth / 2;
 
-    // Height parameters
-    const westHeight = 0.6;     // source area (high)
-    const eastHeight = 0.15;    // house area (low, flat basin)
-    const rimExtra = terrain.valleyDepth; // rim height above floor
+    // Height parameters — very gentle slope so water flows as a rising lake
+    const westHeight = 0.25;    // source area (slightly higher)
+    const eastHeight = 0.18;    // house area (slightly lower)
+    const rimExtra = terrain.valleyDepth;
 
     for (let y = 0; y < height; y++) {
-      // Valley cross-section: 0 at center, 1 at rim
+      // Valley cross-section: narrower toward east (funneling)
       const distFromCenter = Math.abs(y - centerY) / halfValley;
       const valleyFactor = Math.min(distFromCenter, 1.0);
-      // Smooth hermite interpolation
       const rim = valleyFactor * valleyFactor * (3 - 2 * valleyFactor);
 
       for (let x = 0; x < width; x++) {
-        // West-to-east slope: steep in west half, flattening in east
-        const t = x / width; // 0=west, 1=east
-        // Ease-out curve for natural slope that flattens near houses
-        const slopeT = 1 - (1 - t) * (1 - t);
+        // Ease-in slope: gentle at west, steeper toward middle, flattens at east
+        // This keeps a pool at the source but pushes water strongly mid-basin
+        const t = x / width;
+        const slopeT = t * t * (3 - 2 * t); // S-curve: slow start, fast middle, slow end
         const floorHeight = westHeight + (eastHeight - westHeight) * slopeT;
 
         // Add rim walls (north/south edges are higher)
