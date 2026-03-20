@@ -31,7 +31,7 @@ describe('Level', () => {
 
   it('returns level config alongside grid', () => {
     const { grid, config } = Level.load(levelData);
-    expect(config.waterSource.flowRate).toBe(0.08);
+    expect(config.waterSource.flowRate).toBe(0.12);
     expect(config.houses).toHaveLength(3);
     expect(config.resources.sandVolume).toBe(1600);
   });

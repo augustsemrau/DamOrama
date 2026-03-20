@@ -13,7 +13,7 @@
     "type": "pipe",
     "position": { "x": 28, "y": 128 },
     "radius": 6,
-    "flowRate": 0.08,
+    "flowRate": 0.12,
     "maxDepth": 2.0,
     "durationSec": 20,
     "startDelaySec": 0
@@ -29,7 +29,7 @@
     "stoneBlocks": 8
   },
   "sim": {
-    "substepsPerFrame": 2,
+    "substepsPerFrame": 3,
     "erosionThreshold": 0.2,
     "erosionRateSand": 0.005,
     "erosionRateClay": 0.001,
