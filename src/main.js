@@ -1,12 +1,30 @@
 import { EventBus } from './core/EventBus.js';
 import { Level } from './game/Level.js';
+import { GameLoop } from './game/GameLoop.js';
 import { WaterSim } from './sim/WaterSim.js';
 import { SceneBuilder } from './renderer/SceneBuilder.js';
 import { TerrainMesh } from './renderer/TerrainMesh.js';
 import { WaterMesh } from './renderer/WaterMesh.js';
 import { CameraControls } from './input/CameraControls.js';
 import { createBasinWalls } from './renderer/BasinWalls.js';
+import { PhaseControls } from './ui/PhaseControls.js';
 import levelData from './levels/level-01.json';
+
+// Keep initial terrain for reset
+let initialTerrainHeight = null;
+
+function saveInitialTerrain(grid) {
+  initialTerrainHeight = new Float32Array(grid.terrainHeight);
+}
+
+function resetAll(grid, waterSim, waterMesh, terrainMesh, eventBus) {
+  // Restore terrain to initial state
+  grid.terrainHeight.set(initialTerrainHeight);
+  grid.reset(); // zeros materialHeight, waterDepth, materialId, occupancy
+  waterSim.reset();
+  waterMesh.update();
+  eventBus.emit('terrain-changed');
+}
 
 async function main() {
   const eventBus = new EventBus();
@@ -15,10 +33,15 @@ async function main() {
   const { grid, config } = Level.load(levelData);
   const cellSize = config.grid.cellSize;
   const worldSize = grid.width * cellSize;
+  saveInitialTerrain(grid);
 
-  // Water simulation
+  // Water simulation — source disabled until flood phase
   const waterSim = new WaterSim();
   waterSim.init(grid, config);
+  waterSim.setSource(null); // disabled in construction
+
+  // Game loop
+  const gameLoop = new GameLoop(eventBus, config);
 
   // Renderer
   const container = document.getElementById('app');
@@ -40,6 +63,20 @@ async function main() {
     scene.camera, scene.canvas, config.camera
   );
 
+  // Phase controls UI
+  new PhaseControls(container, eventBus, {
+    onStartFlood: () => {
+      waterSim.setSource(config.waterSource); // enable source
+      gameLoop.startFlood();
+    },
+    onRetry: () => {
+      gameLoop.retry(() => {
+        waterSim.setSource(null); // disable source
+        resetAll(grid, waterSim, water, terrain, eventBus);
+      });
+    }
+  });
+
   // --- FPS measurement ---
   let frameCount = 0;
   let fpsAccum = 0;
@@ -48,18 +85,22 @@ async function main() {
     'position:absolute;top:8px;left:8px;color:#0f0;font:14px monospace;z-index:10;';
   container.appendChild(fpsDisplay);
 
-  // Auto-start water for milestone 1 (no game loop yet)
-  // Source is already set via init(); step() handles per-substep injection
-  let simActive = true;
-
   // Render loop
   let lastTime = performance.now();
   function loop(now) {
     requestAnimationFrame(loop);
-    const dt = Math.min((now - lastTime) / 1000, 0.05); // cap at 50ms
+    const dt = Math.min((now - lastTime) / 1000, 0.05);
     lastTime = now;
 
-    if (simActive) {
+    // Game phase update
+    gameLoop.update(dt);
+
+    // Water sim runs only during flood phase
+    if (gameLoop.phase === 'flood') {
+      // Disable source injection once duration expires
+      if (!gameLoop.isSourceActive()) {
+        waterSim.setSource(null);
+      }
       waterSim.step(dt);
       water.update();
     }
