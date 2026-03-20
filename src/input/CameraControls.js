@@ -5,15 +5,16 @@ export class CameraControls {
     this.camera = camera;
     this.controls = new OrbitControls(camera, canvas);
 
-    this.controls.minDistance = 5;
-    this.controls.maxDistance = 30;
-    this.controls.minPolarAngle = 0.2;
-    this.controls.maxPolarAngle = Math.PI / 2.2;
-    this.controls.enablePan = false;
+    this.controls.minDistance = 3;
+    this.controls.maxDistance = 40;
+    this.controls.minPolarAngle = 0.1;          // nearly horizontal
+    this.controls.maxPolarAngle = Math.PI / 2;  // straight down
+    this.controls.enablePan = true;
+    this.controls.panSpeed = 1.0;
     this.controls.mouseButtons = {
-      LEFT: null,
-      MIDDLE: 2,
-      RIGHT: 0
+      LEFT: null,     // LMB reserved for building
+      MIDDLE: 2,      // MMB = pan
+      RIGHT: 0        // RMB = orbit (full spherical)
     };
 
     if (cameraConfig) {
