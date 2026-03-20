@@ -11,6 +11,8 @@ This document captures the technical design decisions for building the v0.4 MVP 
 - **No Rapier physics** — stone blocks are grid occupancy blockers, not rigid bodies
 - **DOM overlays** for all UI — no framework
 - **Desktop-first** input; touch compatibility deferred to milestone 6
+- **Audio deferred** — spec lists audio priorities but does not gate MVP acceptance on them; add during milestone 5 tuning or post-MVP
+- **Pin dependency versions** in package.json (exact versions, not ranges) per spec §12.4
 
 ## Module Structure
 
@@ -126,7 +128,10 @@ Each cell maintains 4 flux values (N/S/E/W) in a separate `Float32Array` owned b
 **PointerInput.js:** Listens to `pointerdown/move/up` on the Three.js canvas. On pointer events during Construction phase:
 1. Raycast from camera through pointer position against terrain mesh
 2. Convert hit point to grid coordinates
-3. Paint selected material within brush radius onto grid (update materialId, materialHeight)
+3. Depending on active tool mode:
+   - **Paint:** Set materialId and increase materialHeight within brush radius (budget-checked)
+   - **Smooth:** Average materialHeight across cells in brush radius (no budget cost)
+   - **Remove:** Clear materialId and materialHeight within brush radius (refunds budget)
 4. Trigger undo snapshot before first cell modification per stroke
 
 Ignores pointer input during Flood and Resolution phases.
@@ -139,7 +144,7 @@ No gesture conflicts: LMB = build, RMB = camera. Always.
 
 All UI is plain HTML/CSS positioned over the canvas. No framework.
 
-- **Toolbar.js** — Fixed bottom bar. Sand/Clay/Stone buttons with active highlight. Brush size slider (`[` / `]` keyboard shortcuts).
+- **Toolbar.js** — Fixed bottom bar. Sand/Clay/Stone/Smooth/Remove mode buttons with active highlight. Brush size slider (`[` / `]` keyboard shortcuts).
 - **BudgetDisplay.js** — Shows remaining sand volume, clay volume, stone block count. Updates on place/remove.
 - **PhaseControls.js** — "Start Flood" button visible in Construction. "Retry" button visible in Resolution. Hidden during Flood.
 - **Postmortem.js** — Appears in Resolution on loss: shows breach origin region, failure cause label (overtopped / eroded through), which house flooded first.
@@ -174,10 +179,20 @@ All UI is plain HTML/CSS positioned over the canvas. No framework.
 - **First flooded house:** First house where water depth at footprint cells exceeds flood threshold
 - **Failure cause:** Overtopped (water over material crest without erosion) vs Eroded (material height reduced before water crossed)
 
+During flood phase, also records the **max water depth path** — the sequence of cells forming the highest-depth connected path from source to breach. This is computed on transition to Resolution by tracing from breach origin back toward source following maximum waterDepth neighbors.
+
 On Resolution, produces a postmortem object:
 ```js
-{ won: bool, breachCell: {x,y}, firstFloodedHouse: id, failureCause: 'overtopped'|'eroded' }
+{
+  won: bool,
+  breachCell: {x,y},
+  maxDepthPath: [{x,y}, ...],   // source-to-breach trace for visualization
+  firstFloodedHouse: id,
+  failureCause: 'overtopped'|'eroded'
+}
 ```
+
+**Replay scrub** (5-second simulation replay) is a nice-to-have for milestone 5. If implemented, it requires a ring buffer of waterDepth snapshots (~1 snapshot per second × 5 seconds). The static postmortem (breach origin, max depth path, failure label) is the mandatory feedback; the scrub enhances it but is not required for the build to be acceptable.
 
 ## Undo System
 
@@ -209,7 +224,7 @@ Following the spec's sequence:
 - Deliverable: can start flood, watch water, retry
 
 **Milestone 3 — Materials and budgets**
-- Materials.js (sand, clay, stone placement)
+- Materials.js (sand, clay, stone placement + smooth + remove modes)
 - ResourceBudget.js
 - PointerInput.js (raycast painting)
 - Toolbar.js + BudgetDisplay.js
