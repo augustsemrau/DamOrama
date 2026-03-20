@@ -57,7 +57,7 @@ export class WaterSim {
         if (!grid.inBounds(x, y)) continue;
         const i = grid.index(x, y);
         grid.waterDepth[i] = Math.min(
-          grid.waterDepth[i] + flowRate,
+          grid.waterDepth[i] + flowRate * dt,
           maxDepth
         );
       }

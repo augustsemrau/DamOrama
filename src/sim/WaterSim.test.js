@@ -81,12 +81,14 @@ describe('WaterSim', () => {
     const source = {
       position: { x: 4, y: 4 },
       radius: 1,
-      flowRate: 0.5,
+      flowRate: 10.0,  // high rate so flowRate * dt * iterations overshoots maxDepth
       maxDepth: 0.8
     };
     sim.setSource(source);
 
-    for (let i = 0; i < 20; i++) {
+    // 60 calls at dt=1/60: total injected per cell = 10 * (1/60) * 60 = 10.0
+    // But capped at maxDepth = 0.8
+    for (let i = 0; i < 60; i++) {
       sim._injectSource(1 / 60);
     }
 
