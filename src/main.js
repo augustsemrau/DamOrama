@@ -12,9 +12,12 @@ import { WaterMesh } from './renderer/WaterMesh.js';
 import { CameraControls } from './input/CameraControls.js';
 import { PointerInput } from './input/PointerInput.js';
 import { createBasinWalls } from './renderer/BasinWalls.js';
+import { HouseVisuals } from './renderer/HouseVisuals.js';
+import { WinLoss } from './game/WinLoss.js';
 import { PhaseControls } from './ui/PhaseControls.js';
 import { Toolbar } from './ui/Toolbar.js';
 import { BudgetDisplay } from './ui/BudgetDisplay.js';
+import { Postmortem } from './ui/Postmortem.js';
 import levelData from './levels/level-01.json';
 
 let initialTerrainHeight = null;
@@ -23,12 +26,13 @@ function saveInitialTerrain(grid) {
   initialTerrainHeight = new Float32Array(grid.terrainHeight);
 }
 
-function resetAll(grid, waterSim, budget, undoSystem, waterMesh, eventBus) {
+function resetAll(grid, waterSim, budget, undoSystem, winLoss, waterMesh, eventBus) {
   grid.terrainHeight.set(initialTerrainHeight);
   grid.reset();
   waterSim.reset();
   budget.reset();
   undoSystem.clear();
+  winLoss.reset();
   waterMesh.update();
   eventBus.emit('terrain-changed');
 }
@@ -71,6 +75,10 @@ async function main() {
   // Basin walls
   createBasinWalls(scene.scene, worldSize);
 
+  // Houses
+  new HouseVisuals(scene.scene, grid, cellSize, config.houses, eventBus);
+  const winLoss = new WinLoss(grid, eventBus, config.houses);
+
   // Camera
   const camControls = new CameraControls(
     scene.camera, scene.canvas, config.camera
@@ -85,6 +93,7 @@ async function main() {
   // UI
   new Toolbar(container, eventBus);
   new BudgetDisplay(container, eventBus, budget.snapshot());
+  new Postmortem(container, eventBus);
 
   new PhaseControls(container, eventBus, {
     onStartFlood: () => {
@@ -94,7 +103,7 @@ async function main() {
     onRetry: () => {
       gameLoop.retry(() => {
         waterSim.setSource(null);
-        resetAll(grid, waterSim, budget, undoSystem, water, eventBus);
+        resetAll(grid, waterSim, budget, undoSystem, winLoss, water, eventBus);
       });
     }
   });
@@ -108,6 +117,7 @@ async function main() {
   container.appendChild(fpsDisplay);
 
   // Render loop
+  let postmortemShown = false;
   let lastTime = performance.now();
   function loop(now) {
     requestAnimationFrame(loop);
@@ -122,7 +132,18 @@ async function main() {
       }
       waterSim.step(dt);
       erosion.step(waterSim.velocity, dt);
+      winLoss.checkFlooding();
       water.update();
+    }
+
+    // Evaluate win/loss on transition to resolution
+    if (gameLoop.phase === 'resolution' && !postmortemShown) {
+      const result = winLoss.evaluate();
+      eventBus.emit('postmortem-ready', result);
+      postmortemShown = true;
+    }
+    if (gameLoop.phase !== 'resolution') {
+      postmortemShown = false;
     }
 
     camControls.update();
