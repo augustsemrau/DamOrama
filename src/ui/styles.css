@@ -1,0 +1,134 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #1a242b; }
+#app { width: 100%; height: 100%; position: relative; font-family: 'Avenir Next', 'Segoe UI', system-ui, sans-serif; }
+canvas { display: block; }
+
+.ui { position: absolute; color: #f4ede0; user-select: none; }
+
+/* ---- Toolbar ---- */
+.toolbar {
+  bottom: 18px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 8px; align-items: center;
+  background: rgba(20, 28, 34, 0.88); padding: 10px 14px; border-radius: 14px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.35);
+}
+.toolbar button {
+  border: 2px solid transparent; border-radius: 10px; padding: 8px 13px;
+  background: #2a363f; color: #e8dfd0; font-size: 14px; font-weight: 600;
+  cursor: pointer; display: flex; align-items: center; gap: 7px;
+}
+.toolbar button:hover { background: #354450; }
+.toolbar button.active { border-color: #f0c66a; background: #3d4d5a; }
+.toolbar button:disabled { opacity: 0.35; cursor: default; }
+.chip { width: 13px; height: 13px; border-radius: 4px; display: inline-block; }
+.chip.sand { background: #d9bd7f; } .chip.clay { background: #b0664a; }
+.chip.stone { background: #8d9499; }
+.toolbar .sep { width: 1px; height: 26px; background: #44525e; margin: 0 4px; }
+.toolbar input[type=range] { width: 90px; accent-color: #f0c66a; }
+.toolbar .size-label { font-size: 12px; opacity: 0.75; }
+
+/* ---- Budget panel ---- */
+.budget {
+  top: 16px; left: 16px; background: rgba(20, 28, 34, 0.88);
+  padding: 12px 14px; border-radius: 12px; min-width: 175px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.35);
+}
+.budget h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.7; margin-bottom: 8px; }
+.budget .row { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 13px; }
+.budget .bar { flex: 1; height: 7px; background: #2a363f; border-radius: 4px; overflow: hidden; }
+.budget .bar i { display: block; height: 100%; border-radius: 4px; transition: width 0.15s; }
+.budget .row.sand .bar i { background: #d9bd7f; }
+.budget .row.clay .bar i { background: #b0664a; }
+.budget .row.stone .bar i { background: #8d9499; }
+.budget .num { width: 42px; text-align: right; font-variant-numeric: tabular-nums; font-size: 12px; opacity: 0.85; }
+
+/* ---- Phase controls ---- */
+.phase { top: 16px; right: 16px; display: flex; flex-direction: column; gap: 10px; align-items: flex-end; }
+.btn-release {
+  background: linear-gradient(180deg, #e8a33d, #c97f1f); color: #241a08;
+  font-size: 17px; font-weight: 800; letter-spacing: 0.02em;
+  border: none; border-radius: 12px; padding: 14px 22px; cursor: pointer;
+  box-shadow: 0 6px 20px rgba(220, 150, 40, 0.4);
+}
+.btn-release:hover { filter: brightness(1.08); }
+.btn-small {
+  background: #2a363f; color: #e8dfd0; border: none; border-radius: 9px;
+  padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.btn-small:hover { background: #354450; }
+.btn-small.active { outline: 2px solid #f0c66a; }
+
+/* ---- Timeline ---- */
+.timeline {
+  top: 16px; left: 50%; transform: translateX(-50%);
+  width: 300px; background: rgba(20, 28, 34, 0.88); border-radius: 10px; padding: 9px 12px;
+  display: none;
+}
+.timeline.visible { display: block; }
+.timeline .track { position: relative; height: 8px; background: #2a363f; border-radius: 4px; overflow: hidden; }
+.timeline .emit-zone { position: absolute; left: 0; top: 0; bottom: 0; background: #3d5a6b; }
+.timeline .fill { position: absolute; left: 0; top: 0; bottom: 0; background: #84bccf; transition: width 0.1s linear; }
+.timeline .lbl { font-size: 11px; opacity: 0.7; margin-top: 5px; text-align: center; }
+
+/* ---- Verdict modal ---- */
+.verdict-wrap {
+  inset: 0; display: none; align-items: center; justify-content: center;
+  background: rgba(10, 16, 20, 0.45);
+}
+.verdict-wrap.visible { display: flex; }
+.verdict {
+  background: #141c22; border-radius: 18px; padding: 30px 38px; text-align: center;
+  max-width: 430px; box-shadow: 0 18px 60px rgba(0,0,0,0.5);
+}
+.verdict h2 { font-size: 24px; margin-bottom: 6px; }
+.verdict.win h2 { color: #8fd6a8; }
+.verdict.loss h2 { color: #e98a70; }
+.verdict .stars { font-size: 30px; letter-spacing: 6px; margin: 8px 0; color: #f0c66a; }
+.verdict p { font-size: 14px; line-height: 1.5; opacity: 0.85; margin: 8px 0; }
+.verdict .advice { color: #a8c6d4; font-style: italic; }
+.verdict .actions { display: flex; gap: 10px; justify-content: center; margin-top: 18px; }
+.verdict .actions button {
+  border: none; border-radius: 10px; padding: 11px 18px; font-size: 14px; font-weight: 700; cursor: pointer;
+}
+.verdict .primary { background: #e8a33d; color: #241a08; }
+.verdict .secondary { background: #2a363f; color: #e8dfd0; }
+.verdict .actions button:hover { filter: brightness(1.1); }
+
+/* ---- Level select ---- */
+.level-select {
+  inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column;
+  background: rgba(13, 20, 25, 0.92); z-index: 10;
+}
+.level-select.visible { display: flex; }
+.level-select h1 { font-size: 34px; margin-bottom: 4px; color: #f0c66a; letter-spacing: 0.04em; }
+.level-select .sub { opacity: 0.65; font-size: 14px; margin-bottom: 28px; }
+.cards { display: flex; gap: 18px; }
+.card {
+  width: 215px; background: #1d2830; border-radius: 16px; padding: 22px;
+  cursor: pointer; border: 2px solid transparent; transition: transform 0.12s, border-color 0.12s;
+}
+.card:hover:not(.locked) { transform: translateY(-4px); border-color: #f0c66a; }
+.card.locked { opacity: 0.45; cursor: default; }
+.card h3 { font-size: 17px; margin-bottom: 7px; }
+.card .stars { color: #f0c66a; font-size: 17px; letter-spacing: 3px; margin-bottom: 8px; }
+.card p { font-size: 12.5px; line-height: 1.45; opacity: 0.75; }
+.card .lock { font-size: 12px; opacity: 0.8; margin-top: 8px; }
+
+/* ---- Hint toast ---- */
+.hint-btn {
+  bottom: 18px; right: 18px; width: 38px; height: 38px; border-radius: 50%;
+  background: #2a363f; color: #e8dfd0; border: none; font-size: 17px; font-weight: 800; cursor: pointer;
+}
+.hint-toast {
+  bottom: 70px; right: 18px; max-width: 290px; background: rgba(20, 28, 34, 0.95);
+  border-left: 3px solid #f0c66a; border-radius: 10px; padding: 13px 16px;
+  font-size: 13.5px; line-height: 1.5; display: none;
+}
+.hint-toast.visible { display: block; }
+
+/* ---- Level name badge ---- */
+.level-badge {
+  top: 70px; right: 16px; text-align: right; opacity: 0.85;
+}
+.level-badge .name { font-size: 15px; font-weight: 700; }
+.level-badge .tagline { font-size: 12px; opacity: 0.7; max-width: 230px; }
