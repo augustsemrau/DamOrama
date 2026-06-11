@@ -105,6 +105,8 @@ function startLevel(level) {
     if (phase === 'build') sound.silence();
   });
 
+  window.__damorama = { gameLoop, grid, sim, budget, level }; // debug/test handle
+
   world = {
     bus, grid, sim, erosion, winLoss, budget, undo, tools, gameLoop,
     terrainMesh, waterMesh, houses, stones, beacon, camera, pointer,

@@ -4,9 +4,9 @@ import { WORLD_SIZE } from '../core/Constants.js';
 export const COLORS = {
   sky: 0xa7bdcb,
   fog: 0xa7bdcb,
-  earthLow: 0x6e5f49,
-  earthHigh: 0xb7a87e,
-  sand: 0xd9bd7f,
+  earthLow: 0x7d6c52,
+  earthHigh: 0xbcab80,
+  sand: 0xe6c98a,
   clay: 0xb0664a,
   stone: 0x8d9499,
   waterShallow: 0x84bccf,
@@ -31,11 +31,16 @@ export class SceneBuilder {
     this.camera = new THREE.PerspectiveCamera(46, window.innerWidth / window.innerHeight, 0.1, 100);
     this.camera.position.set(0, 9, 9.5);
 
-    const hemi = new THREE.HemisphereLight(0xdfeaf2, 0x6b5d49, 0.85);
+    const hemi = new THREE.HemisphereLight(0xdfeaf2, 0x6b5d49, 0.65);
     this.scene.add(hemi);
-    const key = new THREE.DirectionalLight(0xfff2dd, 1.25);
-    key.position.set(-6, 10, 4);
+    // Low raking key light: terrain relief must read at a glance — the
+    // levels teach by their topography.
+    const key = new THREE.DirectionalLight(0xfff2dd, 1.5);
+    key.position.set(-9, 5.5, 3);
     this.scene.add(key);
+    const fill = new THREE.DirectionalLight(0xd8e6ee, 0.35);
+    fill.position.set(7, 8, -5);
+    this.scene.add(fill);
 
     this._addBasinSkirt();
 

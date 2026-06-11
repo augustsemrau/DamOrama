@@ -40,6 +40,16 @@ export class TerrainMesh {
     scene.add(this.mesh);
 
     this.wetMax = new Float32Array(n); // persistent wet-darkening memory
+    // Normalize the earth ramp to this level's actual height range (ignore
+    // the rim) so valley floors read as soil, not voids.
+    let lo = Infinity, hi = -Infinity;
+    for (let i = 0; i < n; i++) {
+      const h = grid.terrainHeight[i];
+      if (h < lo) lo = h;
+      if (h > hi) hi = h;
+    }
+    this._lo = lo;
+    this._range = Math.max(0.001, (hi - lo) * 0.75); // soft-clip the rim tops
     this.update();
     bus.on('terrain-changed', () => this.update());
     bus.on('phase-changed', ({ phase }) => {
@@ -64,8 +74,8 @@ export class TerrainMesh {
       } else if (mat === MAT_CLAY && grid.materialHeight[i] > 0.01) {
         cTmp.copy(cClay);
       } else {
-        const t = Math.min(1, Math.max(0, (grid.terrainHeight[i] + 0.25) / 1.0));
-        cTmp.lerpColors(cEarthLow, cEarthHigh, t);
+        const t = Math.min(1, Math.max(0, (grid.terrainHeight[i] - this._lo) / this._range));
+        cTmp.lerpColors(cEarthLow, cEarthHigh, 0.25 + 0.75 * t);
       }
       const wet = Math.min(1, this.wetMax[i] * 18);
       if (wet > 0) cTmp.multiplyScalar(1 - 0.35 * wet);

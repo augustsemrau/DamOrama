@@ -72,6 +72,7 @@ export class WaterMesh {
     }
     this.geometry.attributes.position.needsUpdate = true;
     this.geometry.attributes.color.needsUpdate = true;
+    this.geometry.computeVertexNormals(); // Phong shades to black without these
   }
 
   setVisible(v) {
