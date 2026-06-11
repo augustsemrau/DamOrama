@@ -60,17 +60,30 @@ describe('WaterSim — stability and conservation', () => {
   });
 });
 
-describe('WaterSim — propagation (level-scale readability)', () => {
-  it('crosses most of a 128-wide sloped basin within 8 sim-seconds', () => {
-    // Mirrors Level 1 scale: west-high slope, emitter near the west edge.
-    const g = makeGrid(128, 128, (x) => 0.6 * (1 - x / 127));
+describe('WaterSim — propagation', () => {
+  // Player-facing flood timing (the "drama window") is asserted per level in
+  // solvability.test.js via house-sensor times. Here we assert the sim-level
+  // truth that makes those timings possible: released water moves downhill
+  // in bulk instead of ponding at the source.
+  it('transports the bulk of injected volume downslope within seconds', () => {
+    const smooth = (a, b, t) => {
+      const u = Math.min(1, Math.max(0, (t - a) / (b - a)));
+      return u * u * (3 - 2 * u);
+    };
+    const g = makeGrid(128, 128, (x, y) =>
+      0.55 * (1 - x / 127) + 0.05 - 0.22 * (1 - smooth(12, 22, Math.abs(y - 64))));
     const sim = new WaterSim(g);
-    sim.setEmitter({ x: 10, y: 64, radius: 4, rate: 0.25, duration: 12 });
+    sim.setEmitter({ x: 12, y: 64, radius: 4, rate: 0.1, duration: 12, head: 0.3 });
 
-    runSeconds(3, sim);
-    expect(wetFrontX(g)).toBeGreaterThan(40);
-    runSeconds(5, sim);
-    expect(wetFrontX(g)).toBeGreaterThan(100);
+    runSeconds(14, sim); // emit ends at 12; by now the bulk has moved on
+    let near = 0, far = 0;
+    for (let y = 0; y < 128; y++) {
+      for (let x = 0; x < 128; x++) {
+        const d = g.waterDepth[g.index(x, y)];
+        if (x < 40) near += d; else far += d;
+      }
+    }
+    expect(far).toBeGreaterThan(near);
     assertFinite(g);
   });
 });

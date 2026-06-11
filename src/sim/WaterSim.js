@@ -15,8 +15,12 @@ import {
 const F_N = 0, F_S = 1, F_E = 2, F_W = 3;
 
 export class WaterSim {
-  constructor(grid) {
+  // opts override the tuned constants — for parameter probes and tests only;
+  // the game itself always runs the defaults so water has one identity.
+  constructor(grid, opts = {}) {
     this.grid = grid;
+    this.pipeK = opts.pipeK ?? PIPE_K;
+    this.damping = opts.damping ?? FLUX_DAMPING;
     const n = grid.cellCount;
     this.flux = new Float32Array(n * 4);
     this.fluxNew = new Float32Array(n * 4);
@@ -42,6 +46,13 @@ export class WaterSim {
       }
     }
     this._emitCells = cells;
+    // A pipe can only push water until the backwater reaches its head.
+    // Without this cap, an inflow rate above the terrain's conveyance just
+    // stacks a water tower on the source cells.
+    const center = this.grid.index(source.x, source.y);
+    this._emitSurface = source.head != null
+      ? this.grid.terrainHeight[center] + source.head
+      : Infinity;
   }
 
   step() {
@@ -56,8 +67,13 @@ export class WaterSim {
     if (!this.emitter || this.emitRemaining <= 0 || !this._emitCells?.length) return;
     const span = Math.min(dt, this.emitRemaining);
     const depthAdd = (this.emitter.rate * span) / (this._emitCells.length * CELL_AREA);
-    const { waterDepth } = this.grid;
-    for (const i of this._emitCells) waterDepth[i] += depthAdd;
+    const { waterDepth, terrainHeight, materialHeight } = this.grid;
+    const cap = this._emitSurface;
+    for (const i of this._emitCells) {
+      const room = cap - (terrainHeight[i] + materialHeight[i] + waterDepth[i]);
+      if (room <= 0) continue;
+      waterDepth[i] += Math.min(depthAdd, room);
+    }
     this.emitRemaining -= dt;
     if (this.emitRemaining < 0) this.emitRemaining = 0;
   }
@@ -66,7 +82,8 @@ export class WaterSim {
     const { grid, flux, fluxNew } = this;
     const { width, height } = grid;
     const { terrainHeight, materialHeight, waterDepth } = grid;
-    const accel = GRAVITY * PIPE_K * dt;
+    const accel = GRAVITY * this.pipeK * dt;
+    const damping = this.damping;
 
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
@@ -85,22 +102,22 @@ export class WaterSim {
         if (y > 0) {
           const n = i - width;
           const dh = h - (terrainHeight[n] + materialHeight[n] + waterDepth[n]);
-          fN = Math.max(0, flux[fi + F_N] * FLUX_DAMPING + accel * dh);
+          fN = Math.max(0, flux[fi + F_N] * damping + accel * dh);
         }
         if (y < height - 1) {
           const n = i + width;
           const dh = h - (terrainHeight[n] + materialHeight[n] + waterDepth[n]);
-          fS = Math.max(0, flux[fi + F_S] * FLUX_DAMPING + accel * dh);
+          fS = Math.max(0, flux[fi + F_S] * damping + accel * dh);
         }
         if (x < width - 1) {
           const n = i + 1;
           const dh = h - (terrainHeight[n] + materialHeight[n] + waterDepth[n]);
-          fE = Math.max(0, flux[fi + F_E] * FLUX_DAMPING + accel * dh);
+          fE = Math.max(0, flux[fi + F_E] * damping + accel * dh);
         }
         if (x > 0) {
           const n = i - 1;
           const dh = h - (terrainHeight[n] + materialHeight[n] + waterDepth[n]);
-          fW = Math.max(0, flux[fi + F_W] * FLUX_DAMPING + accel * dh);
+          fW = Math.max(0, flux[fi + F_W] * damping + accel * dh);
         }
 
         const total = fN + fS + fE + fW;
