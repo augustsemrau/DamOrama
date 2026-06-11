@@ -16,7 +16,11 @@
       "mcp__plugin_playwright_playwright__browser_take_screenshot",
       "mcp__plugin_playwright_playwright__browser_click",
       "mcp__plugin_playwright_playwright__browser_evaluate",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "Bash(cat)",
+      "Bash(node /tmp/erosion-probe.mjs)",
+      "Bash(sed -i '' 's|REPO|__TRACKED_VAR__|g' /tmp/erosion-probe2.mjs)",
+      "Bash(node /tmp/erosion-probe2.mjs)"
     ]
   }
 }
