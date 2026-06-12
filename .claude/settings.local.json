@@ -52,7 +52,9 @@
       "Bash(node /tmp/front-debug.mjs)",
       "Bash(npm run *)",
       "mcp__plugin_playwright_playwright__browser_resize",
-      "mcp__plugin_playwright_playwright__browser_console_messages"
+      "mcp__plugin_playwright_playwright__browser_console_messages",
+      "Bash(kill %1)",
+      "Bash(pkill -f \"vite\")"
     ]
   }
 }
