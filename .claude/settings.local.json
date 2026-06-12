@@ -37,7 +37,6 @@
       "Bash(node /tmp/l2-fine3.mjs)",
       "Bash(sed -i '' 's|REPO|__TRACKED_VAR__|g' /tmp/l2-fine4.mjs)",
       "Bash(node /tmp/l2-fine4.mjs)",
-      "Bash(python3 -)",
       "Bash(sed -i '' 's|REPO|__TRACKED_VAR__|g' /tmp/l2-head.mjs)",
       "Bash(node /tmp/l2-head.mjs)",
       "Bash(sed -i '' 's|REPO|__TRACKED_VAR__|g' /tmp/l2-wall.mjs)",
@@ -54,7 +53,8 @@
       "mcp__plugin_playwright_playwright__browser_resize",
       "mcp__plugin_playwright_playwright__browser_console_messages",
       "Bash(kill %1)",
-      "Bash(python3 -c ' *)"
+      "Bash(pkill -f \"vite\")",
+      "Bash(node -e ' *)"
     ]
   }
 }
